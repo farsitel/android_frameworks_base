@@ -45,4 +45,11 @@
     </font>
     <fallback ttf="DroidSansFallback" />
     <fallback ttf="DroidSansJapanese" />
+    <fallback ttf="irsans.ttf" />
+    <fallback ttf="irsansb.ttf" />
+    <fallback ttf="FreeFarsi.ttf" />
+    <fallback ttf="FreeFarsi-Bold.ttf" />
+    <fallback ttf="FreeFarsi-Italic.ttf" />
+    <fallback ttf="FreeFarsi-BoldItalic.ttf" />
+    <fallback ttf="FreeFarsi-Mono.ttf" />
 </fonts>
