@@ -366,6 +366,7 @@ public class Browser {
             c.deactivate();
             return str;
         } catch (IllegalStateException e) {
+            Log.e(LOGTAG, "getVisitedHistoryByOrder", e);
             return new String[0];
         }
     }

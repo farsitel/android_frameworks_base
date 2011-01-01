@@ -251,6 +251,8 @@ public class GridView extends AbsListView {
                 nextLeft += (mNumColumns - (last - startPos)) * (columnWidth + horizontalSpacing);
             }
         }
+        if (mRTL)
+            nextLeft += (mNumColumns - 1) * (columnWidth + horizontalSpacing);
 
         View selectedView = null;
 
@@ -267,9 +269,16 @@ public class GridView extends AbsListView {
             final int where = flow ? -1 : pos - startPos;
             child = makeAndAddView(pos, y, flow, nextLeft, selected, where);
 
-            nextLeft += columnWidth;
-            if (pos < last - 1) {
-                nextLeft += horizontalSpacing;
+            if (mRTL) {
+                nextLeft -= columnWidth;
+                if (pos < last - 1) {
+                    nextLeft -= horizontalSpacing;
+                }
+            } else {
+                nextLeft += columnWidth;
+                if (pos < last - 1) {
+                    nextLeft += horizontalSpacing;
+                }
             }
 
             if (selected && (hasFocus || inClick)) {

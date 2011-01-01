@@ -137,13 +137,9 @@ public class Selection {
             if (line > 0) {
                 int move;
 
-                if (layout.getParagraphDirection(line) ==
-                    layout.getParagraphDirection(line - 1)) {
-                    float h = layout.getPrimaryHorizontal(end);
-                    move = layout.getOffsetForHorizontal(line - 1, h);
-                } else {
-                    move = layout.getLineStart(line - 1);
-                }
+                // FIXME: Direction?
+                float h = layout.getPrimaryHorizontal(end);
+                move = layout.getOffsetForHorizontal(line - 1, h);
 
                 setSelection(text, move);
                 return true;
@@ -178,13 +174,9 @@ public class Selection {
             if (line < layout.getLineCount() - 1) {
                 int move;
 
-                if (layout.getParagraphDirection(line) ==
-                    layout.getParagraphDirection(line + 1)) {
-                    float h = layout.getPrimaryHorizontal(end);
-                    move = layout.getOffsetForHorizontal(line + 1, h);
-                } else {
-                    move = layout.getLineStart(line + 1);
-                }
+                // FIXME: Direction?
+                float h = layout.getPrimaryHorizontal(end);
+                move = layout.getOffsetForHorizontal(line + 1, h);
 
                 setSelection(text, move);
                 return true;
@@ -254,13 +246,9 @@ public class Selection {
         if (line > 0) {
             int move;
 
-            if (layout.getParagraphDirection(line) ==
-                layout.getParagraphDirection(line - 1)) {
-                float h = layout.getPrimaryHorizontal(end);
-                move = layout.getOffsetForHorizontal(line - 1, h);
-            } else {
-                move = layout.getLineStart(line - 1);
-            }
+            // FIXME: Direction?
+            float h = layout.getPrimaryHorizontal(end);
+            move = layout.getOffsetForHorizontal(line - 1, h);
 
             extendSelection(text, move);
             return true;
@@ -283,13 +271,9 @@ public class Selection {
         if (line < layout.getLineCount() - 1) {
             int move;
 
-            if (layout.getParagraphDirection(line) ==
-                layout.getParagraphDirection(line + 1)) {
-                float h = layout.getPrimaryHorizontal(end);
-                move = layout.getOffsetForHorizontal(line + 1, h);
-            } else {
-                move = layout.getLineStart(line + 1);
-            }
+            // FIXME: Direction?
+            float h = layout.getPrimaryHorizontal(end);
+            move = layout.getOffsetForHorizontal(line + 1, h);
 
             extendSelection(text, move);
             return true;
@@ -360,9 +344,9 @@ public class Selection {
     private static int findEdge(Spannable text, Layout layout, int dir) {
         int pt = getSelectionEnd(text);
         int line = layout.getLineForOffset(pt);
-        int pdir = layout.getParagraphDirection(line);
 
-        if (dir * pdir < 0) {
+        // FIXME: Direction?
+        if (dir < 0) {
             return layout.getLineStart(line);
         } else {
             int end = layout.getLineEnd(line);
@@ -408,9 +392,9 @@ public class Selection {
             // right thing to do is if the ends don't agree.  Even if it
             // is wrong it should still not be too bad.
             int line = layout.getLineForOffset(off1);
-            int textdir = layout.getParagraphDirection(line);
 
-            if (textdir == direction)
+            // FIXME: Direction?
+            if (direction > 0)
                 return Math.max(off1, off2);
             else
                 return Math.min(off1, off2);

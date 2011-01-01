@@ -270,8 +270,10 @@ public class ProgressBar extends View {
                     Shader.TileMode.REPEAT, Shader.TileMode.CLAMP);
             shapeDrawable.getPaint().setShader(bitmapShader);
 
-            return (clip) ? new ClipDrawable(shapeDrawable, Gravity.LEFT,
-                    ClipDrawable.HORIZONTAL) : shapeDrawable;
+            return (clip) ? new ClipDrawable(shapeDrawable, 
+                                             mRTL ? Gravity.RIGHT : Gravity.LEFT,
+                                             ClipDrawable.HORIZONTAL)
+                          : shapeDrawable;
         }
         
         return drawable;

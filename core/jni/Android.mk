@@ -49,7 +49,6 @@ LOCAL_SRC_FILES:= \
 	android_view_Surface.cpp \
 	android_view_ViewRoot.cpp \
 	android_text_AndroidCharacter.cpp \
-	android_text_AndroidBidi.cpp \
 	android_text_KeyCharacterMap.cpp \
 	android_os_Debug.cpp \
 	android_os_FileUtils.cpp \
@@ -67,6 +66,7 @@ LOCAL_SRC_FILES:= \
 	android_nio_utils.cpp \
 	android_pim_EventRecurrence.cpp \
 	android_text_format_Time.cpp \
+	android_text_FriBidi.cpp \
 	android_security_Md5MessageDigest.cpp \
 	android_util_AssetManager.cpp \
 	android_util_Binder.cpp \
@@ -136,6 +136,7 @@ LOCAL_SRC_FILES:= \
 	android_backup_FileBackupHelperBase.cpp \
 	android_backup_BackupHelperDispatcher.cpp
 
+#	android_text_AndroidBidi.cpp
 ifeq ($(BOARD_HAVE_FM_RADIO),true)
 	LOCAL_SRC_FILES += android_hardware_fm.cpp
 	LOCAL_CFLAGS += -DHAVE_FM_RADIO
@@ -161,6 +162,8 @@ LOCAL_C_INCLUDES += \
 	external/tremor/Tremor \
 	external/icu4c/i18n \
 	external/icu4c/common \
+	external/fribidi/lib \
+	external/fribidi/charset \
 	external/jpeg \
 	frameworks/opt/emoji
 
@@ -190,12 +193,18 @@ LOCAL_SHARED_LIBRARIES := \
 	libicudata \
 	libmedia \
 	libwpa_client \
+	libfribidilib \
+	libfribidics \
 	libjpeg
 
 ifneq ($(BOARD_USES_ECLAIR_LIBCAMERA),true)
     LOCAL_SHARED_LIBRARIES += \
-        libsurfaceflinger_client \
-        libcamera_client
+    	libsurfaceflinger_client \
+    	libcamera_client
+endif
+
+ifeq ($(DO_NOT_INCLUDE_LOCK),true)
+    LOCAL_CFLAGS += -DDO_NOT_INCLUDE_LOCK
 endif
 
 ifeq ($(BOARD_HAVE_BLUETOOTH),true)

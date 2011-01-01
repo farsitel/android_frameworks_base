@@ -400,7 +400,11 @@ public class DateUtils
      * @see #getRelativeTimeSpanString(long, long, long)
      */
     public static CharSequence getRelativeTimeSpanString(long startTime) {
-        return getRelativeTimeSpanString(startTime, System.currentTimeMillis(), MINUTE_IN_MILLIS);
+        return getRelativeTimeSpanString(startTime, null);
+    }
+
+    public static CharSequence getRelativeTimeSpanString(long startTime, Context context) {
+        return getRelativeTimeSpanString(startTime, System.currentTimeMillis(), MINUTE_IN_MILLIS, context);
     }
 
     /**
@@ -416,8 +420,12 @@ public class DateUtils
      *     0, MINUTE_IN_MILLIS, HOUR_IN_MILLIS, DAY_IN_MILLIS, WEEK_IN_MILLIS
      */
     public static CharSequence getRelativeTimeSpanString(long time, long now, long minResolution) {
+        return getRelativeTimeSpanString(time, now, minResolution, null);
+    }
+
+    public static CharSequence getRelativeTimeSpanString(long time, long now, long minResolution, Context context) {
         int flags = FORMAT_SHOW_DATE | FORMAT_SHOW_YEAR | FORMAT_ABBREV_MONTH;
-        return getRelativeTimeSpanString(time, now, minResolution, flags);
+        return getRelativeTimeSpanString(time, now, minResolution, flags, context);
     }
 
     /**
@@ -442,6 +450,11 @@ public class DateUtils
      */
     public static CharSequence getRelativeTimeSpanString(long time, long now, long minResolution,
             int flags) {
+        return getRelativeTimeSpanString(time, now, minResolution, flags, null);
+    }
+    
+    public static CharSequence getRelativeTimeSpanString(long time, long now, long minResolution,
+            int flags, Context context) {
         Resources r = Resources.getSystem();
         boolean abbrevRelative = (flags & (FORMAT_ABBREV_RELATIVE | FORMAT_ABBREV_ALL)) != 0;
         
@@ -511,9 +524,10 @@ public class DateUtils
                 }
             }
         } else {
+            // STUPIDHISTORY
             // We know that we won't be showing the time, so it is safe to pass
             // in a null context.
-            return formatDateRange(null, time, time, flags);
+            return formatDateRange(context, time, time, flags);
         }
 
         String format = r.getQuantityString(resId, (int) count);
@@ -563,7 +577,7 @@ public class DateUtils
         
         String result;
         if (duration < transitionResolution) {
-            CharSequence relativeClause = getRelativeTimeSpanString(time, now, minResolution, flags);
+            CharSequence relativeClause = getRelativeTimeSpanString(time, now, minResolution, flags, c);
             result = r.getString(com.android.internal.R.string.relative_time, relativeClause, timeClause);
         } else {
             CharSequence dateClause = getRelativeTimeSpanString(c, time, false);
@@ -960,6 +974,12 @@ public class DateUtils
         return formatDateRange(context, f, startMillis, endMillis, flags).toString();
     }
 
+    public static String formatDateRange(Context context, long startMillis,
+            long endMillis, int flags, boolean jalali) {
+        Formatter f = new Formatter(new StringBuilder(50), Locale.getDefault());
+        return formatDateRange(context, f, startMillis, endMillis, flags, jalali).toString();
+    }
+
     /**
      * Formats a date or a time range according to the local conventions.
      * 
@@ -1114,6 +1134,11 @@ public class DateUtils
      */
     public static Formatter formatDateRange(Context context, Formatter formatter, long startMillis,
             long endMillis, int flags) {
+    	return formatDateRange(context, formatter, startMillis, endMillis, flags, false);
+    }
+    
+    public static Formatter formatDateRange(Context context, Formatter formatter, long startMillis,
+            long endMillis, int flags, boolean jalali) {
         Resources res = Resources.getSystem();
         boolean showTime = (flags & FORMAT_SHOW_TIME) != 0;
         boolean showWeekDay = (flags & FORMAT_SHOW_WEEKDAY) != 0;
@@ -1124,13 +1149,18 @@ public class DateUtils
         boolean abbrevMonth = (flags & (FORMAT_ABBREV_MONTH | FORMAT_ABBREV_ALL)) != 0;
         boolean noMonthDay = (flags & FORMAT_NO_MONTH_DAY) != 0;
         boolean numericDate = (flags & FORMAT_NUMERIC_DATE) != 0;
+        
+        boolean isJalali = jalali;
+        if (!isJalali) {
+        	isJalali = Jalali.isJalali(context);
+        }
 
         // If we're getting called with a single instant in time (from
         // e.g. formatDateTime(), below), then we can skip a lot of
         // computation below that'd otherwise be thrown out.
         boolean isInstant = (startMillis == endMillis);
 
-        Time startDate = useUTC ? new Time(Time.TIMEZONE_UTC) : new Time();
+        Time startDate = useUTC ? new Time(Time.TIMEZONE_UTC, context) : new Time(context);
         startDate.set(startMillis);
 
         Time endDate;
@@ -1139,13 +1169,17 @@ public class DateUtils
             endDate = startDate;
             dayDistance = 0;
         } else {
-            endDate = useUTC ? new Time(Time.TIMEZONE_UTC) : new Time();
+            endDate = useUTC ? new Time(Time.TIMEZONE_UTC, context) : new Time(context);
             endDate.set(endMillis);
             int startJulianDay = Time.getJulianDay(startMillis, startDate.gmtoff);
             int endJulianDay = Time.getJulianDay(endMillis, endDate.gmtoff);
             dayDistance = endJulianDay - startJulianDay;
         }
 
+        JalaliDate jStartDate, jEndDate;
+       	jStartDate = Jalali.gregorianToJalali(startDate);
+       	jEndDate = Jalali.gregorianToJalali(endDate);
+        
         // If the end date ends at 12am at the beginning of a day,
         // then modify it to make it look like it ends at midnight on
         // the previous day.  This will allow us to display "8pm - midnight",
@@ -1283,20 +1317,34 @@ public class DateUtils
         // the starting and end years are different from each other
         // or from the current year.  But don't show the year if the
         // user specified FORMAT_NO_YEAR.
-        if (showYear) {
-            // No code... just a comment for clarity.  Keep showYear
-            // on, as they enabled it with FORMAT_SHOW_YEAR.  This
-            // takes precedence over them setting FORMAT_NO_YEAR.
-        } else if (noYear) {
-            // They explicitly didn't want a year.
-            showYear = false;
-        } else if (startYear != endYear) {
-            showYear = true;
+        if (isJalali) {
+	        if (showYear) {
+	        } else if (noYear) {
+	            showYear = false;
+	        } else if (jStartDate.year != jEndDate.year) {
+	            showYear = true;
+	        } else {
+	            Time currentTime = new Time(context);
+	            currentTime.setToNow();
+	            JalaliDate jCurrentDate = Jalali.gregorianToJalali(currentTime);
+	            showYear = jStartDate.year != jCurrentDate.year;
+	        }
         } else {
-            // Show the year if it's not equal to the current year.
-            Time currentTime = new Time();
-            currentTime.setToNow();
-            showYear = startYear != currentTime.year;
+	        if (showYear) {
+	            // No code... just a comment for clarity.  Keep showYear
+	            // on, as they enabled it with FORMAT_SHOW_YEAR.  This
+	            // takes precedence over them setting FORMAT_NO_YEAR.
+	        } else if (noYear) {
+	            // They explicitly didn't want a year.
+	            showYear = false;
+	        } else if (startYear != endYear) {
+	            showYear = true;
+	        } else {
+	            // Show the year if it's not equal to the current year.
+	            Time currentTime = new Time(context);
+	            currentTime.setToNow();
+	            showYear = startYear != currentTime.year;
+	        }
         }
 
         String defaultDateFormat, fullFormat, dateRange;
@@ -1346,12 +1394,23 @@ public class DateUtils
             }
         }
 
-        if (noMonthDay && startMonthNum == endMonthNum) {
+        boolean cond;
+        if (isJalali) {
+        	cond = (jStartDate.month == jEndDate.month);
+        } else {
+            cond = (startMonthNum == endMonthNum);
+        }
+        if (noMonthDay && cond) {
             // Example: "January, 2008"
-            return formatter.format("%s", startDate.format(defaultDateFormat));
+    		return formatter.format("%s", startDate.format(defaultDateFormat));
         }
 
-        if (startYear != endYear || noMonthDay) {
+        if (isJalali) {
+        	cond = (jStartDate.year != jEndDate.year);
+        } else {
+            cond = (startYear != endYear);
+        }
+        if (cond || noMonthDay) {
             // Different year or we are not showing the month day number.
             // Example: "December 31, 2007 - January 1, 2008"
             // Or: "January - February, 2008"
@@ -1383,7 +1442,12 @@ public class DateUtils
         String endMonthDayString = isInstant ? null : endDate.format(MONTH_DAY_FORMAT);
         String endYearString = isInstant ? null : endDate.format(YEAR_FORMAT);
 
-        if (startMonthNum != endMonthNum) {
+        if (isJalali) {
+        	cond = (jStartDate.month != jEndDate.month);
+        } else {
+            cond = (startMonthNum != endMonthNum);
+        }
+        if (cond) {
             // Same year, different month.
             // Example: "October 28 - November 3"
             // or: "Wed, Oct 31 - Sat, Nov 3, 2007"
@@ -1554,8 +1618,8 @@ public class DateUtils
         long span = now - millis;
 
         if (sNowTime == null) {
-            sNowTime = new Time();
-            sThenTime = new Time();
+            sNowTime = new Time(c);
+            sThenTime = new Time(c);
         }
 
         sNowTime.set(now);

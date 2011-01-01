@@ -50,6 +50,8 @@ import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
 import android.text.format.DateFormat;
+import android.text.format.Jalali;
+import android.text.FriBidi;
 import android.text.style.RelativeSizeSpan;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -352,6 +354,8 @@ public class StatusBarPolicy {
     private IBinder mCdmaRoamingIndicatorIcon;
     private IconData mCdmaRoamingIndicatorIconData;
 
+    private boolean mPersian = false;
+
     private BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -366,6 +370,7 @@ public class StatusBarPolicy {
                 updateBattery(intent);
             }
             else if (action.equals(Intent.ACTION_CONFIGURATION_CHANGED)) {
+                mPersian = FriBidi.isPersian();
                 updateClock();
             }
             else if (action.equals(Intent.ACTION_TIMEZONE_CHANGED)) {
@@ -693,10 +698,11 @@ public class StatusBarPolicy {
 
             mClockFormat = sdf = new SimpleDateFormat(format);
             mClockFormatString = format;
+            mPersian = FriBidi.isPersian();
         } else {
             sdf = mClockFormat;
         }
-        String result = sdf.format(mCalendar.getTime());
+        String result = String.format("%Ls", sdf.format(mCalendar.getTime()));
 
         int magic1 = result.indexOf(MAGIC1);
         int magic2 = result.indexOf(MAGIC2);

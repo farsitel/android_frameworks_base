@@ -17,6 +17,7 @@
 package android.text;
 
 import android.graphics.Paint;
+import android.text.Layout.Alignment;
 import android.text.style.UpdateLayout;
 import android.text.style.WrapTogetherSpan;
 
@@ -95,8 +96,6 @@ extends Layout
             mEllipsizeAt = ellipsize;
         }
 
-        mObjects = new PackedObjectVector<Directions>(1);
-
         mIncludePad = includepad;
 
         /*
@@ -129,13 +128,11 @@ extends Layout
             start = new int[COLUMNS_NORMAL];
         }
 
-        Directions[] dirs = new Directions[] { DIRS_ALL_LEFT_TO_RIGHT };
-
         Paint.FontMetricsInt fm = paint.getFontMetricsInt();
         int asc = fm.ascent;
         int desc = fm.descent;
 
-        start[DIR] = DIR_LEFT_TO_RIGHT << DIR_SHIFT;
+        start[START] = 1 << 30;
         start[TOP] = 0;
         start[DESCENT] = desc;
         mInts.insertAt(0, start);
@@ -143,9 +140,9 @@ extends Layout
         start[TOP] = desc - asc;
         mInts.insertAt(1, start);
 
-        mObjects.insertAt(0, dirs);
-
         // Update from 0 characters to whatever the real text is
+
+        mOriginalAlignment = mAlignment = align;
 
         reflow(base, 0, 0, base.length());
 
@@ -170,6 +167,7 @@ extends Layout
             return;
 
         CharSequence text = mDisplay;
+        //Log.i("FriBidi", "reflow(" + s + "), text = " + text + ", mDisplay = " + mDisplay);
         int len = text.length();
 
         // seek back to the start of the paragraph
@@ -258,11 +256,25 @@ extends Layout
         if (reflowed == null)
             reflowed = new StaticLayout(true);
 
-        reflowed.generate(text, where, where + after,
+        mRTLText = false;
+        mOriginalText = text;
+        mFriBidi = new FriBidi(mOriginalText);
+        if ((mFriBidi.direction == FriBidi.PARAGRAPH_DIRECTION_RTL) ||
+                (mFriBidi.direction == FriBidi.PARAGRAPH_DIRECTION_WRTL))
+            mRTLText = true;
+
+        if (mRTLText) {
+            if (mOriginalAlignment == Alignment.ALIGN_NORMAL)
+                mAlignment = Alignment.ALIGN_OPPOSITE;
+            else if (mOriginalAlignment == Alignment.ALIGN_OPPOSITE)
+                mAlignment = Alignment.ALIGN_NORMAL;
+        }
+
+        reflowed.generate(text, mFriBidi, where, where + after,
                                       getPaint(), getWidth(), getAlignment(),
                                       getSpacingMultiplier(), getSpacingAdd(),
                                       false, true, mEllipsize,
-                                      mEllipsizedWidth, mEllipsizeAt);
+                                      mEllipsizedWidth, mEllipsizeAt, false);
         int n = reflowed.getLineCount();
 
         // If the new layout has a blank line at the end, but it is not
@@ -274,9 +286,7 @@ extends Layout
             n--;
 
         // remove affected lines from old layout
-
         mInts.deleteAt(startline, endline - startline);
-        mObjects.deleteAt(startline, endline - startline);
 
         // adjust offsets in layout for new height and offsets
 
@@ -308,12 +318,8 @@ extends Layout
             ints = new int[COLUMNS_NORMAL];
         }
 
-        Directions[] objects = new Directions[1];
-
-
         for (int i = 0; i < n; i++) {
             ints[START] = reflowed.getLineStart(i) |
-                          (reflowed.getParagraphDirection(i) << DIR_SHIFT) |
                           (reflowed.getLineContainsTab(i) ? TAB_MASK : 0);
 
             int top = reflowed.getLineTop(i) + startv;
@@ -326,7 +332,6 @@ extends Layout
                 desc += botpad;
 
             ints[DESCENT] = desc;
-            objects[0] = reflowed.getLineDirections(i);
 
             if (mEllipsize) {
                 ints[ELLIPSIS_START] = reflowed.getEllipsisStart(i);
@@ -334,7 +339,10 @@ extends Layout
             }
 
             mInts.insertAt(startline + i, ints);
-            mObjects.insertAt(startline + i, objects);
+        }
+
+        for (int i = 0; i < getLineCount(); i++) {
+            mFriBidi.reorder(getLineStart(i), getLineStart(i + 1) - getLineStart(i));
         }
 
         synchronized (sLock) {
@@ -377,14 +385,6 @@ extends Layout
 
     public boolean getLineContainsTab(int line) {
         return (mInts.getValue(line, TAB) & TAB_MASK) != 0;
-    }
-
-    public int getParagraphDirection(int line) {
-        return mInts.getValue(line, DIR) >> DIR_SHIFT;
-    }
-
-    public final Directions getLineDirections(int line) {
-        return mObjects.getValue(line, 0);
     }
 
     public int getTopPadding() {
@@ -476,7 +476,6 @@ extends Layout
     private TextUtils.TruncateAt mEllipsizeAt;
 
     private PackedIntVector mInts;
-    private PackedObjectVector<Directions> mObjects;
 
     private int mTopPadding, mBottomPadding;
 
@@ -484,7 +483,6 @@ extends Layout
     private static Object sLock = new Object();
 
     private static final int START = 0;
-    private static final int DIR = START;
     private static final int TAB = START;
     private static final int TOP = 1;
     private static final int DESCENT = 2;
@@ -495,8 +493,6 @@ extends Layout
     private static final int COLUMNS_ELLIPSIZE = 5;
 
     private static final int START_MASK = 0x1FFFFFFF;
-    private static final int DIR_MASK   = 0xC0000000;
-    private static final int DIR_SHIFT  = 30;
     private static final int TAB_MASK   = 0x20000000;
 
     private static final int ELLIPSIS_UNDEFINED = 0x80000000;

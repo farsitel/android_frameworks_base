@@ -2130,8 +2130,8 @@
     <!-- Title of the pop-up dialog in which the user switches input method components. -->
     <string name="select_input_method">Select input method</string>
 
-    <string name="fast_scroll_alphabet">\u0020ABCDEFGHIJKLMNOPQRSTUVWXYZ</string>
-    <string name="fast_scroll_numeric_alphabet">\u00200123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ</string>
+    <string name="fast_scroll_alphabet">\u0020ABCDEFGHIJKLMNOPQRSTUVWXYZآاب‌پ‌ت‌ث‌ج‌چ‌ح‌خ‌دذرزس‌ش‌ص‌ض‌ط‌ظ‌ع‌غ‌ف‌ق‌ک‌گ‌ل‌م‌ن‌وه‌ی</string>
+    <string name="fast_scroll_numeric_alphabet">\u00200123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ۰۱۲۳۴۵۶۷۸۹آاب‌پ‌ت‌ث‌ج‌چ‌ح‌خ‌دذرزس‌ش‌ص‌ض‌ط‌ظ‌ع‌غ‌ف‌ق‌ک‌گ‌ل‌م‌ن‌وه‌ی</string>
 
     <string name="candidates_style"><u>candidates</u></string>
 
@@ -2217,6 +2217,15 @@
     <!--              [default-locale]                 -->
     <!--              [default-wifi-allowed-channels]] -->
     <string-array translatable="false" name="carrier_properties">
+        <item>IR-TCI</item>
+            <item>fa_IR</item>
+            <item></item>
+        <item>IR-MCI</item>
+            <item>fa_IR</item>
+            <item></item>
+        <item>Irancell</item>
+            <item>fa_IR</item>
+            <item></item>
     </string-array>
 
     <!-- Title for the selected state of a CompoundButton. -->
@@ -2286,6 +2295,8 @@
     <!-- Shown when the users bandwidth is reduced because of excessive data use -->
     <string name="throttled_notification_title">Mobile data limit exceeded</string>
     <string name="throttled_notification_message">Touch to learn more about mobile data use</string>
+
+    <string name="progress_dialog_message_text_number">%d/%d</string>
 
     <!-- Reboot recommended after applying color changes (CM) -->
     <string name="toast_reboot_recommend">Caution: Reboot recommended after finishing customization!</string>

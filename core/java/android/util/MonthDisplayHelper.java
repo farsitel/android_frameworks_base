@@ -16,6 +16,9 @@
 
 package android.util;
 
+import android.text.format.Jalali;
+import android.text.format.JalaliDate;
+
 import java.util.Calendar;
 
 /**
@@ -37,6 +40,12 @@ public class MonthDisplayHelper {
     private int mNumDaysInPrevMonth;
     private int mOffset;
 
+    private boolean mJalali;
+    private JalaliDate mJalaliDate;
+    private Calendar mJalaliCalendar;
+    private int mNumDaysInJalaliMonth;
+    private int mNumDaysInPrevJalaliMonth;
+    private int mJalaliOffset;
 
     /**
      * @param year The year.
@@ -44,11 +53,23 @@ public class MonthDisplayHelper {
      * @param weekStartDay What day of the week the week should start.
      */
     public MonthDisplayHelper(int year, int month, int weekStartDay) {
+    	this(year, month, weekStartDay, false);
+    }
+    public MonthDisplayHelper(int year, int month, int weekStartDay, boolean jalali) {
+    	this(year, month, 1, weekStartDay, jalali);
+    }
+    
+    public MonthDisplayHelper(int year, int month, int dayOfMonth, int weekStartDay, boolean jalali) {
+    	mJalali = jalali;
 
-        if (weekStartDay < Calendar.SUNDAY || weekStartDay > Calendar.SATURDAY) {
-            throw new IllegalArgumentException();
-        }
-        mWeekStartDay = weekStartDay;
+    	if (mJalali) {
+    		mWeekStartDay = Calendar.SATURDAY;
+    	} else {
+	        if (weekStartDay < Calendar.SUNDAY || weekStartDay > Calendar.SATURDAY) {
+	            throw new IllegalArgumentException();
+	        }
+	        mWeekStartDay = weekStartDay;
+    	}
 
         mCalendar = Calendar.getInstance();
         mCalendar.set(Calendar.YEAR, year);
@@ -59,12 +80,20 @@ public class MonthDisplayHelper {
         mCalendar.set(Calendar.SECOND, 0);
         mCalendar.getTimeInMillis();
 
+        mJalaliDate = Jalali.gregorianToJalali(year, month + 1, dayOfMonth);
+        mJalaliDate.day = 1;
+        mJalaliCalendar = Jalali.jalaliToGregorian(mJalaliDate);
+
         recalculate();
     }
 
 
     public MonthDisplayHelper(int year, int month) {
         this(year, month, Calendar.SUNDAY);
+    }
+
+    public MonthDisplayHelper(int year, int month, boolean jalali) {
+        this(year, month, Calendar.SUNDAY, jalali);
     }
 
 
@@ -86,13 +115,19 @@ public class MonthDisplayHelper {
      *   {@link java.util.Calendar#SUNDAY}.
      */
     public int getFirstDayOfMonth() {
-        return mCalendar.get(Calendar.DAY_OF_WEEK);
+    	if (mJalali) {
+    		return mJalaliCalendar.get(Calendar.DAY_OF_WEEK);
+    	}
+   		return mCalendar.get(Calendar.DAY_OF_WEEK);
     }
 
     /**
      * @return The number of days in the month.
      */
     public int getNumberOfDaysInMonth() {
+    	if (mJalali) {
+    		return mNumDaysInJalaliMonth;
+    	}
         return mNumDaysInMonth;
     }
 
@@ -103,6 +138,9 @@ public class MonthDisplayHelper {
      *   the week as Sunday, and the month starts on a Wednesday, the offset is 3.
      */
     public int getOffset() {
+    	if (mJalali) {
+    		return mJalaliOffset;
+    	}
         return mOffset;
     }
 
@@ -120,9 +158,9 @@ public class MonthDisplayHelper {
 
         int [] result = new int[7];
         for (int column = 0; column < 7; column++) {
-            result[column] = getDayAt(row, column);
+            result[column] = getDayAt(row, column, mJalali);
         }
-
+        
         return result;
     }
 
@@ -132,21 +170,72 @@ public class MonthDisplayHelper {
      * @return The day at a particular row, column
      */
     public int getDayAt(int row, int column) {
+    	return getDayAt(row, column, false);
+    }
 
-        if (row == 0 && column < mOffset) {
-            return mNumDaysInPrevMonth + column - mOffset + 1;
+    public int getDayAt(int row, int column, boolean jalali) {
+    	if (mJalali) {
+	    	JalaliDate result = new JalaliDate(mJalaliDate.year, mJalaliDate.month, 1);
+
+	        if (row == 0 && column < mJalaliOffset) {
+	        	result.decreaseMonth(1);
+	       		result.day = mNumDaysInPrevJalaliMonth + column - mJalaliOffset + 1;
+	        } else {
+	        	int day = 7 * row + column - mJalaliOffset + 1;
+
+	        	if (day > mNumDaysInJalaliMonth) {
+	        		result.day = day - mNumDaysInJalaliMonth;
+	        		result.increaseMonth(1);
+	        	} else {
+	        		result.day = day;
+	        	}
+	        }
+
+	        if (jalali) {
+	        	return result.day;
+	        } else {
+	        	Calendar resultCalendar = Jalali.jalaliToGregorian(result);
+	        	return resultCalendar.get(Calendar.DAY_OF_MONTH);
+	        }
+    	} else {
+	        if (row == 0 && column < mOffset) {
+	       		return mNumDaysInPrevMonth + column - mOffset + 1;
+	        }
+
+	        int day = 7 * row + column - mOffset + 1;
+	        
+	        return (day > mNumDaysInMonth) ?
+	        		day - mNumDaysInMonth : day;
+    	}
+    }
+
+    public JalaliDate getJalaliDateAt(int row, int column) {
+    	JalaliDate result = new JalaliDate(mJalaliDate.year, mJalaliDate.month, 1);
+    	
+        if (row == 0 && column < mJalaliOffset) {
+        	result.decreaseMonth(1);
+       		result.day = mNumDaysInPrevJalaliMonth + column - mJalaliOffset + 1;
+        } else {
+        	int day = 7 * row + column - mJalaliOffset + 1;
+        
+        	if (day > mNumDaysInJalaliMonth) {
+        		result.day = day - mNumDaysInJalaliMonth;
+        		result.increaseMonth(1);
+        	} else {
+        		result.day = day;
+        	}
         }
 
-        int day = 7 * row + column - mOffset + 1;
-
-        return (day > mNumDaysInMonth) ?
-                day - mNumDaysInMonth : day;
+    	return result;
     }
 
     /**
      * @return Which row day is in.
      */
     public int getRowOf(int day) {
+    	if (mJalali) {
+            return (day + mJalaliOffset - 1) / 7;
+    	}
         return (day + mOffset - 1) / 7;
     }
 
@@ -154,6 +243,9 @@ public class MonthDisplayHelper {
      * @return Which column day is in.
      */
     public int getColumnOf(int day) {
+    	if (mJalali) {
+            return (day + mJalaliOffset - 1) % 7;
+    	}
         return (day + mOffset - 1) % 7;
     }
 
@@ -161,6 +253,10 @@ public class MonthDisplayHelper {
      * Decrement the month.
      */
     public void previousMonth() {
+    	if (mJalali) {
+    		mJalaliDate.decreaseMonth(1);
+            mJalaliCalendar = Jalali.jalaliToGregorian(mJalaliDate);
+    	}
         mCalendar.add(Calendar.MONTH, -1);
         recalculate();
     }
@@ -169,6 +265,10 @@ public class MonthDisplayHelper {
      * Increment the month.
      */
     public void nextMonth() {
+    	if (mJalali) {
+    		mJalaliDate.increaseMonth(1);
+            mJalaliCalendar = Jalali.jalaliToGregorian(mJalaliDate);
+    	}
         mCalendar.add(Calendar.MONTH, 1);
         recalculate();
     }
@@ -181,21 +281,48 @@ public class MonthDisplayHelper {
         if (row < 0 || column < 0 || row > 5 || column > 6) {
             return false;
         }
+        
+        if (mJalali) {
+	        if (row == 0 && column < mJalaliOffset) {
+	            return false;
+	        }
 
-        if (row == 0 && column < mOffset) {
-            return false;
+	        int day = 7 * row + column - mJalaliOffset + 1;
+	        if (day > mNumDaysInJalaliMonth) {
+	            return false;
+	        }
+        } else {
+	        if (row == 0 && column < mOffset) {
+	            return false;
+	        }
+
+	        int day = 7 * row + column - mOffset + 1;
+	        if (day > mNumDaysInMonth) {
+	            return false;
+	        }
         }
 
-        int day = 7 * row + column - mOffset + 1;
-        if (day > mNumDaysInMonth) {
-            return false;
-        }
         return true;
     }
 
 
     // helper method that recalculates cached values based on current month / year
     private void recalculate() {
+
+    	if (mJalali) {
+    		mNumDaysInJalaliMonth = Jalali.getMaxMonthDay(mJalaliDate.year, mJalaliDate.month);
+
+    		mJalaliDate.decreaseMonth(1);
+            mNumDaysInPrevJalaliMonth = Jalali.getMaxMonthDay(mJalaliDate.year, mJalaliDate.month);
+    		mJalaliDate.increaseMonth(1);
+
+            int firstDayOfMonth = getFirstDayOfMonth();
+            int offset = firstDayOfMonth - mWeekStartDay;
+            if (offset < 0) {
+                offset += 7;
+            }
+            mJalaliOffset = offset;
+    	}
 
         mNumDaysInMonth = mCalendar.getActualMaximum(Calendar.DAY_OF_MONTH);
 

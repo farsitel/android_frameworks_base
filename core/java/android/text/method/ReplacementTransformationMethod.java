@@ -105,9 +105,9 @@ implements TransformationMethod
         // This callback isn't used.
     }
 
-    private static class ReplacementCharSequence
+    protected static class ReplacementCharSequence
     implements CharSequence, GetChars {
-        private char[] mOriginal, mReplacement;
+        protected char[] mOriginal, mReplacement;
 
         public ReplacementCharSequence(CharSequence source, char[] original,
                                        char[] replacement) {

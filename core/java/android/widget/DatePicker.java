@@ -22,6 +22,8 @@ import android.content.res.TypedArray;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.format.DateFormat;
+import android.text.format.Jalali;
+import android.text.format.JalaliDate;
 import android.util.AttributeSet;
 import android.util.SparseArray;
 import android.view.LayoutInflater;
@@ -47,7 +49,13 @@ public class DatePicker extends FrameLayout {
 
     private static final int DEFAULT_START_YEAR = 1900;
     private static final int DEFAULT_END_YEAR = 2100;
+    // 1305..1467 is the range of validity of our calendar algorithm
+    private static final int DEFAULT_JALALI_START_YEAR = 1305; 
+    private static final int DEFAULT_JALALI_END_YEAR = 1467;
     
+    private static final String GREGORIAN_CALENDAR = "gregorian";
+    private static final String JALALI_CALENDAR = "jalali";
+
     /* UI Components */
     private final NumberPicker mDayPicker;
     private final NumberPicker mMonthPicker;
@@ -61,6 +69,13 @@ public class DatePicker extends FrameLayout {
     private int mDay;
     private int mMonth;
     private int mYear;
+    
+    private boolean mJalali;
+    private String mCalendarType;
+    private int mJalaliStartYear;
+    private int mJalaliEndYear;
+    private int mGregorianStartYear;
+    private int mGregorianEndYear;
 
     /**
      * The callback used to indicate the user changes the date.
@@ -88,11 +103,13 @@ public class DatePicker extends FrameLayout {
     public DatePicker(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
 
+        mJalali = Jalali.isJalali(context);
+
         LayoutInflater inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         inflater.inflate(R.layout.date_picker, this, true);
 
         mDayPicker = (NumberPicker) findViewById(R.id.day);
-        mDayPicker.setFormatter(NumberPicker.TWO_DIGIT_FORMATTER);
+        mDayPicker.setFormatter(NumberPicker.getTwoDigitFormatter());
         mDayPicker.setSpeed(100);
         mDayPicker.setOnChangeListener(new OnChangedListener() {
             public void onChanged(NumberPicker picker, int oldVal, int newVal) {
@@ -101,22 +118,14 @@ public class DatePicker extends FrameLayout {
             }
         });
         mMonthPicker = (NumberPicker) findViewById(R.id.month);
-        mMonthPicker.setFormatter(NumberPicker.TWO_DIGIT_FORMATTER);
+        mMonthPicker.setFormatter(NumberPicker.getTwoDigitFormatter());
         DateFormatSymbols dfs = new DateFormatSymbols();
         String[] months = dfs.getShortMonths();
-
-        /*
-         * If the user is in a locale where the month names are numeric,
-         * use just the number instead of the "month" character for
-         * consistency with the other fields.
-         */
-        if (months[0].startsWith("1")) {
-            for (int i = 0; i < months.length; i++) {
-                months[i] = String.valueOf(i + 1);
-            }
+        if (mJalali || months[0].startsWith("1")) {
+            mMonthPicker.setRange(1, 12);
+        } else {
+            mMonthPicker.setRange(1, 12, months);
         }
-
-        mMonthPicker.setRange(1, 12, months);
         mMonthPicker.setSpeed(200);
         mMonthPicker.setOnChangeListener(new OnChangedListener() {
             public void onChanged(NumberPicker picker, int oldVal, int newVal) {
@@ -146,9 +155,15 @@ public class DatePicker extends FrameLayout {
         // attributes
         TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.DatePicker);
 
-        int mStartYear = a.getInt(R.styleable.DatePicker_startYear, DEFAULT_START_YEAR);
-        int mEndYear = a.getInt(R.styleable.DatePicker_endYear, DEFAULT_END_YEAR);
-        mYearPicker.setRange(mStartYear, mEndYear);
+        mJalaliStartYear = DEFAULT_JALALI_START_YEAR;
+        mJalaliEndYear = DEFAULT_JALALI_END_YEAR;
+        mGregorianStartYear = a.getInt(R.styleable.DatePicker_startYear, DEFAULT_START_YEAR);
+        mGregorianEndYear = a.getInt(R.styleable.DatePicker_endYear, DEFAULT_END_YEAR);
+        if (mJalali) {
+            mYearPicker.setRange(mJalaliStartYear, mJalaliEndYear);
+        } else {
+            mYearPicker.setRange(mGregorianStartYear, mGregorianEndYear);
+        }
         
         a.recycle();
         
@@ -176,6 +191,14 @@ public class DatePicker extends FrameLayout {
         java.text.DateFormat format;
         String order;
 
+        if (mJalali) {
+            LinearLayout parent = (LinearLayout) findViewById(R.id.parent);
+            parent.removeAllViews();
+            parent.addView (mYearPicker);
+            parent.addView(mMonthPicker);
+            parent.addView(mDayPicker);
+            return;
+        }
         /*
          * If the user is in a locale where the medium date format is
          * still numeric (Japanese and Czech, for example), respect
@@ -239,10 +262,24 @@ public class DatePicker extends FrameLayout {
     }
 
     public void updateDate(int year, int monthOfYear, int dayOfMonth) {
-        if (mYear != year || mMonth != monthOfYear || mDay != dayOfMonth) {
-            mYear = year;
-            mMonth = monthOfYear;
-            mDay = dayOfMonth;
+        boolean updated = false;
+        if (mJalali) {
+            JalaliDate jDate = Jalali.gregorianToJalali(year, monthOfYear + 1, dayOfMonth);
+            if (mYear != jDate.year || (mMonth != (jDate.month - 1)) || mDay != jDate.day) {
+                updated = true;
+                mYear = jDate.year;
+                mMonth = jDate.month - 1;
+                mDay = jDate.day;
+            }
+        } else {
+            if (mYear != year || mMonth != monthOfYear || mDay != dayOfMonth) {
+                updated = true;
+                mYear = year;
+                mMonth = monthOfYear;
+                mDay = dayOfMonth;
+            }
+        }
+        if (updated) {
             updateSpinners();
             reorderPickers(new DateFormatSymbols().getShortMonths());
             notifyDateChanged();
@@ -280,7 +317,8 @@ public class DatePicker extends FrameLayout {
         }
 
         public int getMonth() {
-            return mMonth;
+            // FIXME: +1 ?! Does it always work?
+            return mMonth + 1;
         }
 
         public int getDay() {
@@ -342,9 +380,49 @@ public class DatePicker extends FrameLayout {
      */
     public void init(int year, int monthOfYear, int dayOfMonth,
             OnDateChangedListener onDateChangedListener) {
-        mYear = year;
-        mMonth = monthOfYear;
-        mDay = dayOfMonth;
+        init(year, monthOfYear, dayOfMonth, onDateChangedListener, "");
+    }
+
+    public void init(int year, int monthOfYear, int dayOfMonth,
+            OnDateChangedListener onDateChangedListener, String calendarType) {
+        mCalendarType = calendarType;
+        boolean forcedJalali = mJalali;
+        if (mCalendarType.equals(JALALI_CALENDAR)) {
+            forcedJalali = true;
+        } else if (mCalendarType.equals(GREGORIAN_CALENDAR)) {
+            forcedJalali = false;
+        }
+
+        if (forcedJalali && !mJalali) {
+            // switch from Gregorian to Jalali
+            mJalali = forcedJalali;
+
+            DateFormatSymbols dfs = new DateFormatSymbols();
+            String[] months = dfs.getShortMonths();
+            mMonthPicker.setRange(1, 12);
+            mYearPicker.setRange(mJalaliStartYear, mJalaliEndYear);
+            reorderPickers(months);
+        } else if (!forcedJalali && mJalali) {
+            // switch from Jalali to Gregorian
+            mJalali = forcedJalali;
+
+            DateFormatSymbols dfs = new DateFormatSymbols();
+            String[] months = dfs.getShortMonths();
+            mMonthPicker.setRange(1, 12, months);
+            mYearPicker.setRange(mGregorianStartYear, mGregorianEndYear);
+            reorderPickers(months);
+        }
+
+        if (mJalali) {
+            JalaliDate jDate = Jalali.gregorianToJalali(year, monthOfYear + 1, dayOfMonth);
+            mYear = jDate.year;
+            mMonth = jDate.month - 1;
+            mDay = jDate.day;
+        } else {
+            mYear = year;
+            mMonth = monthOfYear;
+            mDay = dayOfMonth;
+        }
         mOnDateChangedListener = onDateChangedListener;
         updateSpinners();
     }
@@ -360,30 +438,49 @@ public class DatePicker extends FrameLayout {
     }
 
     private void updateDaySpinner() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(mYear, mMonth, mDay);
-        int max = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        int max;
+        if (mJalali) {
+            max = Jalali.getMaxMonthDay(mYear, mMonth + 1);
+        } else {
+            Calendar cal = Calendar.getInstance();
+            cal.set(mYear, mMonth, mDay);
+            max = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        }
         mDayPicker.setRange(1, max);
         mDayPicker.setCurrent(mDay);
     }
 
     public int getYear() {
+        if (mJalali) {
+            return Jalali.jalaliToGregorian(mYear, mMonth + 1, mDay).get(Calendar.YEAR);
+        }
         return mYear;
     }
 
     public int getMonth() {
+        if (mJalali) {
+            return Jalali.jalaliToGregorian(mYear, mMonth + 1, mDay).get(Calendar.MONTH);
+        }
         return mMonth;
     }
 
     public int getDayOfMonth() {
+        if (mJalali) {
+            return Jalali.jalaliToGregorian(mYear, mMonth + 1, mDay).get(Calendar.DAY_OF_MONTH);
+        }
         return mDay;
     }
 
     private void adjustMaxDay(){
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.YEAR, mYear);
-        cal.set(Calendar.MONTH, mMonth);
-        int max = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        int max;
+        if (mJalali) {
+            max = Jalali.getMaxMonthDay(mYear, mMonth + 1);
+        } else {
+            Calendar cal = Calendar.getInstance();
+            cal.set(Calendar.YEAR, mYear);
+            cal.set(Calendar.MONTH, mMonth);
+            max = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        }
         if (mDay > max) {
             mDay = max;
         }

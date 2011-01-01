@@ -144,7 +144,7 @@ public class AppWidgetHostView extends FrameLayout {
         // in a remote Context. To help resolve any remote references, we
         // inflate through our last mRemoteContext when it exists.
         final Context context = mRemoteContext != null ? mRemoteContext : mContext;
-        return new FrameLayout.LayoutParams(context, attrs);
+        return new FrameLayout.LayoutParams(context, attrs, mRTL);
     }
 
     /**

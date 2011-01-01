@@ -296,6 +296,11 @@ public class ExpandableListView extends ListView {
                 } else {
                     indicatorRect.left = mIndicatorLeft;
                     indicatorRect.right = mIndicatorRight;
+                    if (mRTL) {
+                        int temp = indicatorRect.left;
+                        indicatorRect.left = mRight - indicatorRect.right;
+                        indicatorRect.right = mRight - temp;
+                    }
                 }
                 
                 lastItemType = pos.position.type; 

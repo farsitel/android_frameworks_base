@@ -1165,7 +1165,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     public void setPadding(int left, int top, int right, int bottom) {
         super.setPadding(left, top, right, bottom);
 
-        if ((mPaddingLeft | mPaddingTop | mPaddingRight | mPaddingRight) != 0) {
+        if ((mPaddingLeft | mPaddingTop | mPaddingRight | mPaddingBottom) != 0) {
             mGroupFlags |= FLAG_PADDING_NOT_NULL;
         } else {
             mGroupFlags &= ~FLAG_PADDING_NOT_NULL;
@@ -3603,7 +3603,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
          * @hide
          */
         public String debug(String output) {
-            return output + "ViewGroup.LayoutParams={ width="
+            return output + getClass() + "={ width="
                     + sizeToString(width) + ", height=" + sizeToString(height) + " }";
         }
 
@@ -3665,7 +3665,21 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
          * @param attrs the set of attributes from which to extract the layout
          *              parameters' values
          */
+        @Deprecated
         public MarginLayoutParams(Context c, AttributeSet attrs) {
+            this(c, attrs, false);
+        }
+
+        /**
+         * Creates a new set of layout parameters. The values are extracted from
+         * the supplied attributes set and context.
+         *
+         * @param c the application environment
+         * @param attrs the set of attributes from which to extract the layout
+         *              parameters' values
+         * @param rtl mirrors margin if true
+         */
+        public MarginLayoutParams(Context c, AttributeSet attrs, boolean rtl) {
             super();
 
             TypedArray a = c.obtainStyledAttributes(attrs, R.styleable.ViewGroup_MarginLayout);
@@ -3692,6 +3706,9 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             }
 
             a.recycle();
+
+            if (rtl)
+            	doMirror();
         }
 
         /**
@@ -3714,6 +3731,13 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             this.topMargin = source.topMargin;
             this.rightMargin = source.rightMargin;
             this.bottomMargin = source.bottomMargin;
+        }
+
+        protected void doMirror() {
+        	int temp;
+        	temp = this.leftMargin;
+            this.leftMargin = this.rightMargin;
+            this.rightMargin = temp;
         }
 
         /**

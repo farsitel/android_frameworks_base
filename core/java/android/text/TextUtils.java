@@ -59,6 +59,7 @@ public class TextUtils {
     public static void getChars(CharSequence s, int start, int end,
                                 char[] dest, int destoff) {
         Class c = s.getClass();
+        end = Math.min(end, s.length());
 
         if (c == String.class)
             ((String) s).getChars(start, end, dest, destoff);
@@ -1127,7 +1128,7 @@ public class TextUtils {
         for (int i = 0; i < len; i = next) {
             next = sp.nextSpanTransition(i, len, MetricAffectingSpan.class);
 
-            Styled.getTextWidths(p, temppaint, sp, i, next, wid, null);
+            Styled.getTextWidths(p, temppaint, sp, null, i, next, wid, null);
             System.arraycopy(wid, 0, wid, len + i, next - i);
         }
 
@@ -1327,7 +1328,7 @@ public class TextUtils {
             for (int i = 0; i < len; i = next) {
                 next = sp.nextSpanTransition(i, len, MetricAffectingSpan.class);
 
-                Styled.getTextWidths(p, temppaint, sp, i, next, wid, null);
+                Styled.getTextWidths(p, temppaint, sp, null, i, next, wid, null);
                 System.arraycopy(wid, 0, wid, len + i, next - i);
             }
 

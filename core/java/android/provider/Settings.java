@@ -1652,6 +1652,28 @@ public final class Settings {
         public static final String DATE_FORMAT = "date_format";
 
         /**
+         * Calendar type string
+         *   Gregorian
+         *   Jalali
+         */
+        public static final String CALENDAR_TYPE = "calendar_type";
+
+        /**
+         * Calendar type string :: Gregorian
+         */
+        public static final String GREGORIAN_CALENDAR = "gregorian";
+
+        /**
+         * Calendar type string :: Jalali
+         */
+        public static final String JALALI_CALENDAR = "jalali";
+
+        /**
+         * Calendar type string default from system
+         */
+        public static final String DEFAULT_CALENDAR_TYPE = SystemProperties.get("ro.com.android.calendartype").toLowerCase();
+
+        /**
          * Whether the setup wizard has been run before (on first boot), or if
          * it still needs to be run.
          *

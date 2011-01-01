@@ -629,7 +629,7 @@ public class TableLayout extends LinearLayout {
      */
     @Override
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new TableLayout.LayoutParams(getContext(), attrs);
+        return new TableLayout.LayoutParams(getContext(), attrs, mRTL);
     }
 
     /**
@@ -668,8 +668,13 @@ public class TableLayout extends LinearLayout {
         /**
          * {@inheritDoc}
          */
+        @Deprecated
         public LayoutParams(Context c, AttributeSet attrs) {
-            super(c, attrs);
+            super(c, attrs, false);
+        }
+
+        public LayoutParams(Context c, AttributeSet attrs, boolean rtl) {
+            super(c, attrs, rtl);
         }
 
         /**

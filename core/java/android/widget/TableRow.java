@@ -346,7 +346,7 @@ public class TableRow extends LinearLayout {
      */
     @Override
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new TableRow.LayoutParams(getContext(), attrs);
+        return new TableRow.LayoutParams(getContext(), attrs, mRTL);
     }
 
     /**
@@ -404,8 +404,13 @@ public class TableRow extends LinearLayout {
         /**
          * {@inheritDoc}
          */
+        @Deprecated
         public LayoutParams(Context c, AttributeSet attrs) {
-            super(c, attrs);
+            this(c, attrs, false);
+        }
+
+        public LayoutParams(Context c, AttributeSet attrs, boolean rtl) {
+            super(c, attrs, rtl);
 
             TypedArray a =
                     c.obtainStyledAttributes(attrs,

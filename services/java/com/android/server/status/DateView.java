@@ -20,18 +20,27 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.text.format.Jalali;
 import android.util.AttributeSet;
 import android.util.Slog;
 import android.widget.TextView;
 import android.view.MotionEvent;
+import android.view.RemotableViewMethod;
+
+import com.android.internal.R;
 
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 public final class DateView extends TextView {
     private static final String TAG = "DateView";
 
     private boolean mUpdating = false;
+    private boolean mJalali = false;
+    private CharSequence mJalaliLongDate;
+    
+    private Context mContext;
 
     private BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
@@ -46,6 +55,9 @@ public final class DateView extends TextView {
 
     public DateView(Context context, AttributeSet attrs) {
         super(context, attrs);
+       	mContext = context;
+       	mJalali = Jalali.isJalali(mContext);
+       	mJalaliLongDate = mContext.getText(R.string.jalali_long_date);
     }
 
     @Override
@@ -67,11 +79,17 @@ public final class DateView extends TextView {
 
     private final void updateClock() {
         Date now = new Date();
-        setText(DateFormat.getDateInstance(DateFormat.LONG).format(now));
+        if (mJalali) {
+        	setText(android.text.format.DateFormat.format(mJalaliLongDate, now, true));
+        } else {
+       		setText(String.format("%Ls", DateFormat.getDateInstance(DateFormat.LONG).format(now)));
+        }
     }
 
     void setUpdates(boolean update) {
         if (update != mUpdating) {
+           	mJalali = Jalali.isJalali(mContext);
+           	mJalaliLongDate = mContext.getText(R.string.jalali_long_date);
             mUpdating = update;
             if (update) {
                 // Register for Intent broadcasts for the clock and battery

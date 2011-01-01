@@ -24,6 +24,7 @@ import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.Handler;
 import android.text.format.Time;
+import android.text.format.Jalali;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.provider.Settings;
@@ -68,12 +69,16 @@ public class DateTimeView extends TextView {
     private boolean mAttachedToWindow;
     private long mUpdateTimeMillis;
 
+    Context mContext;
+
     public DateTimeView(Context context) {
         super(context);
+        mContext = context;
     }
 
     public DateTimeView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        mContext = context;
     }
 
     @Override
@@ -161,7 +166,17 @@ public class DateTimeView extends TextView {
         }
 
         // Set the text
-        String text = format.format(mTime);
+        String text;
+        if ((display == SHOW_MONTH_DAY_YEAR) && Jalali.isJalali(mContext)) {
+            CharSequence dateFormat = Settings.System.getString(getContext().getContentResolver(),
+                    Settings.System.DATE_FORMAT);
+            if (dateFormat == null || "".equals(dateFormat)) {
+                dateFormat = "yy/MM/dd";
+            }
+            text = (String) android.text.format.DateFormat.format(dateFormat, mTime, true);
+        } else {
+            text = format.format(mTime);
+        }
         setText(text);
 
         // Schedule the next update

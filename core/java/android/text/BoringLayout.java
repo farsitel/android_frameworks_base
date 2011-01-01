@@ -111,6 +111,8 @@ public class BoringLayout extends Layout implements TextUtils.EllipsizeCallback 
             trust = false;
         }
 
+        // mText = (mOriginalText == null) ? null : FriBidi.logicalToVisual(mOriginalText.toString());
+
         init(getText(), paint, outerwidth, align, spacingmult, spacingadd,
              metrics, includepad, trust);
         return this;
@@ -210,7 +212,7 @@ public class BoringLayout extends Layout implements TextUtils.EllipsizeCallback 
              */
             synchronized (sTemp) {
                 mMax = (int) (FloatMath.ceil(Styled.measureText(paint, sTemp,
-                                                source, 0, source.length(),
+                                                source, null, 0, source.length(),
                                                 null)));
             }
         }
@@ -281,7 +283,7 @@ public class BoringLayout extends Layout implements TextUtils.EllipsizeCallback 
 
             synchronized (sTemp) {
                 wid = (int) (FloatMath.ceil(Styled.measureText(paint, sTemp,
-                                                text, 0, text.length(), fm)));
+                                                text, null, 0, text.length(), fm)));
             }
             fm.width = wid;
             return fm;
@@ -316,7 +318,7 @@ public class BoringLayout extends Layout implements TextUtils.EllipsizeCallback 
             return getText().length();
     }
 
-    @Override public int getParagraphDirection(int line) {
+    @Override @Deprecated public int getParagraphDirection(int line) {
         return DIR_LEFT_TO_RIGHT;
     }
 
@@ -328,7 +330,7 @@ public class BoringLayout extends Layout implements TextUtils.EllipsizeCallback 
         return mMax;
     }
 
-    @Override public final Directions getLineDirections(int line) {
+    @Override @Deprecated public final Directions getLineDirections(int line) {
         return Layout.DIRS_ALL_LEFT_TO_RIGHT;
     }
 
@@ -360,7 +362,7 @@ public class BoringLayout extends Layout implements TextUtils.EllipsizeCallback 
     public void draw(Canvas c, Path highlight, Paint highlightpaint,
                      int cursorOffset) {
         if (mDirect != null && highlight == null) {
-            c.drawText(mDirect, 0, mBottom - mDesc, mPaint);
+            c._drawText(mDirect, 0, mBottom - mDesc, mPaint);
         } else {
             super.draw(c, highlight, highlightpaint, cursorOffset);
         }

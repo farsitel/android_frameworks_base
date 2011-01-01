@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2009, 2010 The FarsiTel Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +23,8 @@ import android.content.DialogInterface.OnClickListener;
 import android.os.Bundle;
 import android.text.TextUtils.TruncateAt;
 import android.text.format.DateFormat;
+import android.text.format.Jalali;
+import android.text.format.JalaliDate;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.DatePicker;
@@ -42,6 +45,9 @@ import java.util.Calendar;
 public class DatePickerDialog extends AlertDialog implements OnClickListener, 
         OnDateChangedListener {
 
+    private static final String GREGORIAN_CALENDAR = "gregorian";
+    private static final String JALALI_CALENDAR = "jalali";
+
     private static final String YEAR = "year";
     private static final String MONTH = "month";
     private static final String DAY = "day";
@@ -55,6 +61,9 @@ public class DatePickerDialog extends AlertDialog implements OnClickListener,
     private int mInitialYear;
     private int mInitialMonth;
     private int mInitialDay;
+    private boolean mJalali;
+    private String mCalendarType;
+    private CharSequence mJalaliFullDate;
 
     /**
      * The callback used to indicate the user is done filling in the date.
@@ -101,6 +110,16 @@ public class DatePickerDialog extends AlertDialog implements OnClickListener,
             int year,
             int monthOfYear,
             int dayOfMonth) {
+    	this(context, theme, callBack, year, monthOfYear, dayOfMonth, "");
+    }
+
+    public DatePickerDialog(Context context,
+            int theme,
+            OnDateSetListener callBack,
+            int year,
+            int monthOfYear,
+            int dayOfMonth,
+            String calendarType) {
         super(context, theme);
 
         mCallBack = callBack;
@@ -110,10 +129,24 @@ public class DatePickerDialog extends AlertDialog implements OnClickListener,
         DateFormatSymbols symbols = new DateFormatSymbols();
         mWeekDays = symbols.getShortWeekdays();
         
+       	mJalali = Jalali.isJalali(context);
+       	mCalendarType = calendarType;
+       	if (mCalendarType.length() > 0) {
+       		if (mCalendarType.equals(JALALI_CALENDAR))
+       			mJalali = true;
+       		else
+       			mJalali = false;
+       	}
+       	mJalaliFullDate = context.getText(R.string.jalali_full_date);
         mTitleDateFormat = java.text.DateFormat.
                                 getDateInstance(java.text.DateFormat.FULL);
         mCalendar = Calendar.getInstance();
-        updateTitle(mInitialYear, mInitialMonth, mInitialDay);
+        if (mJalali) {
+        	JalaliDate jDate = Jalali.gregorianToJalali(mInitialYear, mInitialMonth + 1, mInitialDay);
+        	updateTitle(jDate.year, jDate.month - 1, jDate.day);
+        } else {
+        	updateTitle(mInitialYear, mInitialMonth, mInitialDay);
+        }
         
         setButton(context.getText(R.string.date_time_set), this);
         setButton2(context.getText(R.string.cancel), (OnClickListener) null);
@@ -124,7 +157,7 @@ public class DatePickerDialog extends AlertDialog implements OnClickListener,
         View view = inflater.inflate(R.layout.date_picker_dialog, null);
         setView(view);
         mDatePicker = (DatePicker) view.findViewById(R.id.datePicker);
-        mDatePicker.init(mInitialYear, mInitialMonth, mInitialDay, this);
+        mDatePicker.init(mInitialYear, mInitialMonth, mInitialDay, this, mCalendarType);
     }
 
     @Override
@@ -161,10 +194,14 @@ public class DatePickerDialog extends AlertDialog implements OnClickListener,
     }
 
     private void updateTitle(int year, int month, int day) {
-        mCalendar.set(Calendar.YEAR, year);
-        mCalendar.set(Calendar.MONTH, month);
-        mCalendar.set(Calendar.DAY_OF_MONTH, day);
-        setTitle(mTitleDateFormat.format(mCalendar.getTime()));
+        if (mJalali) {
+        	setTitle(android.text.format.DateFormat.format(mJalaliFullDate, Jalali.jalaliToGregorian(year, month + 1, day).getTime(), true));
+        } else {
+            mCalendar.set(Calendar.YEAR, year);
+            mCalendar.set(Calendar.MONTH, month);
+            mCalendar.set(Calendar.DAY_OF_MONTH, day);
+        	setTitle(mTitleDateFormat.format(mCalendar.getTime()));
+        }
     }
     
     @Override

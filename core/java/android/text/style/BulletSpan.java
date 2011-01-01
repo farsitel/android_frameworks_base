@@ -89,8 +89,12 @@ public class BulletSpan implements LeadingMarginSpan, ParcelableSpan {
 
             p.setStyle(Paint.Style.FILL);
 
-            c.drawCircle(x + dir * BULLET_RADIUS, (top + bottom) / 2.0f,
-                         BULLET_RADIUS, p);
+            if (l.isRTLText())
+                c.drawCircle(x - mGapWidth + BULLET_RADIUS, (top + bottom) / 2.0f,
+                        BULLET_RADIUS, p);
+            else
+	            c.drawCircle(x + BULLET_RADIUS, (top + bottom) / 2.0f,
+	                         BULLET_RADIUS, p);
 
             if (mWantColor) {
                 p.setColor(oldcolor);

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <!-- Title for the VPN Services activity. -->
+    <string name="app_label">خدمات VPN</string>
+
+    <string name="vpn_notification_title_connected">VPN<xliff:g id="profilename">%s</xliff:g> متصل شد</string>
+    <string name="vpn_notification_title_disconnected">VPN<xliff:g id="profilename">%s</xliff:g> قطع شد</string>
+    <string name="vpn_notification_hint_disconnected">برای اتصال مجدد به یک VPN، اینجا را لمس کنید.</string>
+</resources>
+

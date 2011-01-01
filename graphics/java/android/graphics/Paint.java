@@ -16,6 +16,7 @@
 
 package android.graphics;
 
+import android.text.FriBidi;
 import android.text.TextUtils;
 import android.text.SpannableString;
 import android.text.SpannedString;
@@ -998,10 +999,11 @@ public class Paint {
      * @return      The width of the text
      */
     public float measureText(char[] text, int index, int count) {
-        if (!mHasCompatScaling) return native_measureText(text, index, count);
+        String textS = new FriBidi(new String(text)).before_reorder;
+        if (!mHasCompatScaling) return native_measureText(textS, index, count);
         final float oldSize = getTextSize();
         setTextSize(oldSize*mCompatScaling);
-        float w = native_measureText(text, index, count);
+        float w = native_measureText(textS, index, count);
         setTextSize(oldSize);
         return w*mInvCompatScaling;
     }
@@ -1017,6 +1019,16 @@ public class Paint {
      * @return      The width of the text
      */
     public float measureText(String text, int start, int end) {
+        text = new FriBidi(text).before_reorder;
+        if (!mHasCompatScaling) return native_measureText(text, start, end);
+        final float oldSize = getTextSize();
+        setTextSize(oldSize*mCompatScaling);
+        float w = native_measureText(text, start, end);
+        setTextSize(oldSize);
+        return w*mInvCompatScaling;
+    }
+
+    public float _measureText(String text, int start, int end) {
         if (!mHasCompatScaling) return native_measureText(text, start, end);
         final float oldSize = getTextSize();
         setTextSize(oldSize*mCompatScaling);
@@ -1034,6 +1046,7 @@ public class Paint {
      * @return      The width of the text
      */
     public float measureText(String text) {
+        text = new FriBidi(text).before_reorder;
         if (!mHasCompatScaling) return native_measureText(text);
         final float oldSize = getTextSize();
         setTextSize(oldSize*mCompatScaling);
@@ -1070,7 +1083,7 @@ public class Paint {
         TemporaryBuffer.recycle(buf);
         return result;
     }
-    
+
     /**
      * Measure the text, stopping early if the measured width exceeds maxWidth.
      * Return the number of chars that were measured, and if measuredWidth is
@@ -1194,12 +1207,14 @@ public class Paint {
             throw new ArrayIndexOutOfBoundsException();
         }
         
+        String textS = new FriBidi(new String(text)).before_reorder;
+
         if (!mHasCompatScaling) {
-            return native_getTextWidths(mNativePaint, text, index, count, widths);
+            return native_getTextWidths(mNativePaint, textS, index, count, widths);
         }
         final float oldSize = getTextSize();
         setTextSize(oldSize*mCompatScaling);
-        int res = native_getTextWidths(mNativePaint, text, index, count, widths);
+        int res = native_getTextWidths(mNativePaint, textS, index, count, widths);
         setTextSize(oldSize);
         for (int i=0; i<res; i++) {
             widths[i] *= mInvCompatScaling;
@@ -1238,6 +1253,27 @@ public class Paint {
     	return result;
     }
 
+    public int _getTextWidths(String text, int start, int end, float[] widths) {
+        if ((start | end | (end - start) | (text.length() - end)) < 0) {
+            throw new IndexOutOfBoundsException();
+        }
+        if (end - start > widths.length) {
+            throw new ArrayIndexOutOfBoundsException();
+        }
+        
+        if (!mHasCompatScaling) {
+            return native_getTextWidths(mNativePaint, text, start, end, widths);
+        }
+        final float oldSize = getTextSize();
+        setTextSize(oldSize*mCompatScaling);
+        int res = native_getTextWidths(mNativePaint, text, start, end, widths);
+        setTextSize(oldSize);
+        for (int i=0; i<res; i++) {
+            widths[i] *= mInvCompatScaling;
+        }
+        return res;
+    }
+
     /**
      * Return the advance widths for the characters in the string.
      *
@@ -1256,6 +1292,7 @@ public class Paint {
             throw new ArrayIndexOutOfBoundsException();
         }
         
+        text = new FriBidi(text).before_reorder;
         if (!mHasCompatScaling) {
             return native_getTextWidths(mNativePaint, text, start, end, widths);
         }
@@ -1299,18 +1336,7 @@ public class Paint {
         if ((index | count) < 0 || index + count > text.length) {
             throw new ArrayIndexOutOfBoundsException();
         }
-        boolean hasBidi=Canvas.bidiTest(text,index,count);
-        if (hasBidi) {
-            char[] bidiText;
-            bidiText=Canvas.bidiProcess(text,index,count);
-            String reshapedText=ArabicReshape.reshape(new String(bidiText));
-            /* The reshaping may make the string smaller */
-            native_getTextPath(mNativePaint, reshapedText.toCharArray(), 0,
-                                count - ((count-reshapedText.length())>0 ? (count-reshapedText.length()) : 0),
-                                x, y, path.ni());
-        } else {
-            native_getTextPath(mNativePaint, text, index, count, x, y, path.ni());
-        }
+        native_getTextPath(mNativePaint, text, index, count, x, y, path.ni());
     }
 
     /**
@@ -1331,17 +1357,8 @@ public class Paint {
         if ((start | end | (end - start) | (text.length() - end)) < 0) {
             throw new IndexOutOfBoundsException();
         }
-        boolean hasBidi=Canvas.bidiTest(text,start,start+end);
-        if (hasBidi) {
-            char[] bidiText;
-            bidiText=Canvas.bidiProcess(text.toCharArray(),start,start+end);
-            String reshapedText=ArabicReshape.reshape(String.valueOf(bidiText));
-            /* The reshaping may make the string smaller */
-            native_getTextPath(mNativePaint, reshapedText, 0, end-start - ((end-start - reshapedText.length())>0 ? (end-start - reshapedText.length()) : 0),
-                                x, y, path.ni());
-        } else {
-            native_getTextPath(mNativePaint, text, start, end, x, y, path.ni());
-        }
+        text = new FriBidi(text).reorderOnce();
+        native_getTextPath(mNativePaint, text, start, end, x, y, path.ni());
     }
     
     /**
@@ -1361,6 +1378,7 @@ public class Paint {
         if (bounds == null) {
             throw new NullPointerException("need bounds Rect");
         }
+        text = new FriBidi(text).before_reorder;
         nativeGetStringBounds(mNativePaint, text, start, end, bounds);
     }
     

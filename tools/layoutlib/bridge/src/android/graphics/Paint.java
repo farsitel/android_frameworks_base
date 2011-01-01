@@ -16,6 +16,7 @@
 
 package android.graphics;
 
+import android.text.FriBidi;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.SpannedString;
@@ -862,7 +863,7 @@ public class Paint extends _Original_Paint {
      */
     @Override
     public float measureText(String text, int start, int end) {
-        return measureText(text.toCharArray(), start, end - start);
+        return measureText((new FriBidi(new String(text))).before_reorder.toCharArray(), start, end - start);
     }
 
     /**
@@ -873,7 +874,7 @@ public class Paint extends _Original_Paint {
      */
     @Override
     public float measureText(String text) {
-        return measureText(text.toCharArray(), 0, text.length());
+        return measureText((new FriBidi(new String(text))).before_reorder.toCharArray(), 0, text.length());
     }
 
     /*
@@ -890,6 +891,26 @@ public class Paint extends _Original_Paint {
             return measureText(text.toString(), start, end);
         }
         if (text instanceof SpannableStringBuilder) {
+            return ((SpannableStringBuilder)text).measureText(start, end, this);
+        }
+
+        char[] buf = TemporaryBuffer.obtain(end - start);
+        TextUtils.getChars(text, start, end, buf, 0);
+        float result = measureText(new String(buf), 0, end - start);
+        TemporaryBuffer.recycle(buf);
+        return result;
+    }
+
+    public float _measureText(CharSequence text, int start, int end) {
+        if (text instanceof String) {
+            return measureText(((String)text).toCharArray(), start, end - start);
+        }
+        if (text instanceof SpannedString ||
+            text instanceof SpannableString) {
+            return measureText(text.toString().toCharArray(), start, end - start);
+        }
+        if (text instanceof SpannableStringBuilder) {
+            // I guess SpannableStringBuilder didn't use FriBidi until now :P Another bug fix by accident?
             return ((SpannableStringBuilder)text).measureText(start, end, this);
         }
 

@@ -290,7 +290,11 @@ public class FrameLayout extends ViewGroup {
                 final int width = child.getMeasuredWidth();
                 final int height = child.getMeasuredHeight();
 
-                int childLeft = parentLeft;
+                int childLeft;
+                if (mRTL)
+                    childLeft = parentRight - width;
+                else
+                    childLeft = parentLeft;
                 int childTop = parentTop;
 
                 final int gravity = lp.gravity;
@@ -301,14 +305,20 @@ public class FrameLayout extends ViewGroup {
 
                     switch (horizontalGravity) {
                         case Gravity.LEFT:
-                            childLeft = parentLeft + lp.leftMargin;
+                            if (mRTL)
+                                childLeft = parentRight - width - lp.rightMargin;
+                            else
+                                childLeft = parentLeft + lp.leftMargin;
                             break;
                         case Gravity.CENTER_HORIZONTAL:
                             childLeft = parentLeft + (parentRight - parentLeft - width) / 2 +
                                     lp.leftMargin - lp.rightMargin;
                             break;
                         case Gravity.RIGHT:
-                            childLeft = parentRight - width - lp.rightMargin;
+                            if (mRTL)
+                                childLeft = parentLeft + lp.leftMargin;
+                            else
+                                childLeft = parentRight - width - lp.rightMargin;
                             break;
                         default:
                             childLeft = parentLeft + lp.leftMargin;
@@ -415,7 +425,7 @@ public class FrameLayout extends ViewGroup {
      */
     @Override
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new FrameLayout.LayoutParams(getContext(), attrs);        
+        return new FrameLayout.LayoutParams(getContext(), attrs, mRTL);        
     }
 
     /**
@@ -448,8 +458,13 @@ public class FrameLayout extends ViewGroup {
         /**
          * {@inheritDoc}
          */
+        @Deprecated
         public LayoutParams(Context c, AttributeSet attrs) {
-            super(c, attrs);
+            this(c, attrs, false);
+        }
+
+        public LayoutParams(Context c, AttributeSet attrs, boolean rtl) {
+            super(c, attrs, rtl);
 
             TypedArray a = c.obtainStyledAttributes(attrs, com.android.internal.R.styleable.FrameLayout_Layout);
             gravity = a.getInt(com.android.internal.R.styleable.FrameLayout_Layout_layout_gravity, -1);

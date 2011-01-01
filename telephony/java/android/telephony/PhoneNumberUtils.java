@@ -23,6 +23,7 @@ import android.net.Uri;
 import android.os.SystemProperties;
 import android.provider.Contacts;
 import android.provider.ContactsContract;
+import android.text.format.Jalali;
 import android.text.Editable;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -76,7 +77,7 @@ public class PhoneNumberUtils
      * written-sep         = ("-"/".")
      */
     private static final Pattern GLOBAL_PHONE_NUMBER_PATTERN =
-            Pattern.compile("[\\+]?[0-9.-]+");
+            Pattern.compile("[\\+]?[0-9\u06f0-\u06f9.-]+");
 
     /** True if c is ISO-LATIN characters 0-9 */
     public static boolean
@@ -84,16 +85,22 @@ public class PhoneNumberUtils
         return c >= '0' && c <= '9';
     }
 
+    /** True if c is characters 0-9 or \u06f0-\u06f9 */
+    public static boolean
+    isDigit (char c) {
+        return (c >= '0' && c <= '9') || (c >= Jalali.PERSIAN_ZERO && c <= Jalali.PERSIAN_NINE);
+    }
+
     /** True if c is ISO-LATIN characters 0-9, *, # */
     public final static boolean
     is12Key(char c) {
-        return (c >= '0' && c <= '9') || c == '*' || c == '#';
+        return (c >= '0' && c <= '9') || (c >= Jalali.PERSIAN_ZERO && c <= Jalali.PERSIAN_NINE) || c == '*' || c == '#';
     }
 
     /** True if c is ISO-LATIN characters 0-9, *, # , +, WILD  */
     public final static boolean
     isDialable(char c) {
-        return (c >= '0' && c <= '9') || c == '*' || c == '#' || c == '+' || c == WILD;
+        return (c >= '0' && c <= '9') || (c >= Jalali.PERSIAN_ZERO && c <= Jalali.PERSIAN_NINE) || c == '*' || c == '#' || c == '+' || c == WILD;
     }
 
     /** True if c is ISO-LATIN characters 0-9, *, # , + (no WILD)  */
@@ -105,7 +112,7 @@ public class PhoneNumberUtils
     /** True if c is ISO-LATIN characters 0-9, *, # , +, WILD, WAIT, PAUSE   */
     public final static boolean
     isNonSeparator(char c) {
-        return (c >= '0' && c <= '9') || c == '*' || c == '#' || c == '+'
+        return (c >= '0' && c <= '9') || (c >= Jalali.PERSIAN_ZERO && c <= Jalali.PERSIAN_NINE) || c == '*' || c == '#' || c == '+'
                 || c == WILD || c == WAIT || c == PAUSE;
     }
 
@@ -418,6 +425,9 @@ public class PhoneNumberUtils
             return false;
         }
 
+        a = Jalali.replacePersianDigits(a);
+        b = Jalali.replacePersianDigits(b);
+
         ia = indexOfLastNetworkChar (a);
         ib = indexOfLastNetworkChar (b);
         matched = 0;
@@ -517,6 +527,9 @@ public class PhoneNumberUtils
         } else if (a.length() == 0 && b.length() == 0) {
             return false;
         }
+
+        a = Jalali.replacePersianDigits(a);
+        b = Jalali.replacePersianDigits(b);
 
         int forwardIndexA = 0;
         int forwardIndexB = 0;
@@ -924,6 +937,8 @@ public class PhoneNumberUtils
     charToBCD(char c) {
         if (c >= '0' && c <= '9') {
             return c - '0';
+        } else if (c >= Jalali.PERSIAN_ZERO && c <= Jalali.PERSIAN_NINE) {
+            return c - Jalali.PERSIAN_ZERO;
         } else if (c == '*') {
             return 0xa;
         } else if (c == '#') {
@@ -1058,6 +1073,8 @@ public class PhoneNumberUtils
     public static final int FORMAT_NANP = 1;
     /** Japanese formatting */
     public static final int FORMAT_JAPAN = 2;
+    /** Iranian formatting */
+    public static final int FORMAT_IRAN = 3;
 
     /** List of country codes for countries that use the NANP */
     private static final String[] NANP_COUNTRIES = new String[] {
@@ -1142,12 +1159,18 @@ public class PhoneNumberUtils
     public static void formatNumber(Editable text, int defaultFormattingType) {
         int formatType = defaultFormattingType;
 
+        // Replacing Persian digits, inlined because of performance
+        text.replace(0, text.length(), Jalali.replacePersianDigits(text.toString()), 0, text.length());
+
         if (text.length() > 2 && text.charAt(0) == '+') {
             if (text.charAt(1) == '1') {
                 formatType = FORMAT_NANP;
             } else if (text.length() >= 3 && text.charAt(1) == '8'
                 && text.charAt(2) == '1') {
                 formatType = FORMAT_JAPAN;
+            } else if (text.length() >= 3 && text.charAt(1) == '9'
+                && text.charAt(2) == '8') {
+                formatType = FORMAT_IRAN;
             } else {
                 return;
             }
@@ -1159,6 +1182,9 @@ public class PhoneNumberUtils
                 return;
             case FORMAT_JAPAN:
                 formatJapaneseNumber(text);
+                return;
+            case FORMAT_IRAN:
+                formatIranianNumber(text);
                 return;
         }
     }
@@ -1304,6 +1330,25 @@ public class PhoneNumberUtils
      */
     public static void formatJapaneseNumber(Editable text) {
         JapanesePhoneNumberFormatter.format(text);
+    }
+
+    /**
+     * Formats a phone number in-place using the Iranian formatting rules.
+     * Numbers will be formatted as:
+     *
+     * <p><code>
+     * 021-xxxx-xxxx
+     * 0912-xxx-xxxx
+     * +98-21-xxxx-xxxx
+     * +98-912-xxxx-xxxx
+     * 04246853-xxxxx
+     * </code></p>
+     *
+     * @param text the number to be formatted, will be modified with
+     * the formatting
+     */
+    public static void formatIranianNumber(Editable text) {
+        IranianPhoneNumberFormatter.format(text);
     }
 
     // Three and four digit phone numbers for either special services,
@@ -1633,6 +1678,9 @@ public class PhoneNumberUtils
         if ("jp".compareToIgnoreCase(country) == 0) {
             return FORMAT_JAPAN;
         }
+        if ("ir".compareToIgnoreCase(country) == 0) {
+            return FORMAT_IRAN;
+        }
         return FORMAT_UNKNOWN;
     }
 
@@ -1821,13 +1869,13 @@ public class PhoneNumberUtils
                 case 1:
                 case 3:
                 case 5:
-                    if      (isISODigit(c)) state = 6;
+                    if      (isDigit(c)) state = 6;
                     else if (isNonSeparator(c)) return false;
                 break;
 
                 case 6:
                 case 7:
-                    if      (isISODigit(c)) state++;
+                    if      (isDigit(c)) state++;
                     else if (isNonSeparator(c)) return false;
                 break;
 
@@ -1896,6 +1944,8 @@ public class PhoneNumberUtils
     private static int tryGetISODigit(char ch) {
         if ('0' <= ch && ch <= '9') {
             return ch - '0';
+        } else if (Jalali.PERSIAN_ZERO <= ch && ch <= Jalali.PERSIAN_NINE) {
+            return ch - Jalali.PERSIAN_ZERO;
         } else {
             return -1;
         }

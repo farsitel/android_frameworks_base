@@ -735,12 +735,14 @@ public class Keyboard {
                         inKey = true;
                         key = createKeyFromXml(res, currentRow, x, y, parser);
                         mKeys.add(key);
-                        if (key.codes[0] == KEYCODE_SHIFT) {
-                            mShiftKey = key;
-                            mShiftKeyIndex = mKeys.size()-1;
-                            mModifierKeys.add(key);
-                        } else if (key.codes[0] == KEYCODE_ALT) {
-                            mModifierKeys.add(key);
+                        if (key.codes.length > 0) {
+                            if (key.codes[0] == KEYCODE_SHIFT) {
+                                mShiftKey = key;
+                                mShiftKeyIndex = mKeys.size()-1;
+                                mModifierKeys.add(key);
+                            } else if (key.codes[0] == KEYCODE_ALT) {
+                                mModifierKeys.add(key);
+                            }
                         }
                     } else if (TAG_KEYBOARD.equals(tag)) {
                         parseKeyboardAttributes(res, parser);

@@ -196,6 +196,12 @@ public class Build {
     public static final String USER = getString("ro.build.user");
     public static final String HOST = getString("ro.build.host");
 
+    /** FarsiTel Version info */
+    public static class FARSITEL {
+        public static final String VERSION = getString("ro.build.farsitel.version"); // x.y
+        public static final String BATCHNO = getString("ro.build.farsitel.batchno"); // Number
+    }
+
     private static String getString(String property) {
         return SystemProperties.get(property, UNKNOWN);
     }

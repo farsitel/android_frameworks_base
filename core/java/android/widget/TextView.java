@@ -70,6 +70,7 @@ import android.text.method.LinkMovementMethod;
 import android.text.method.MetaKeyKeyListener;
 import android.text.method.MovementMethod;
 import android.text.method.PasswordTransformationMethod;
+import android.text.method.LocalizedDigitsTransformationMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.text.method.TextKeyListener;
 import android.text.method.TimeKeyListener;
@@ -255,6 +256,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private boolean mRestartMarquee;
 
     private int mMarqueeRepeatLimit = 3;
+
+    private boolean mRTLText = false;
+    private boolean mMirroredOnce = false;
 
     class InputContentType {
         int imeOptions = EditorInfo.IME_NULL;
@@ -872,6 +876,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             typefaceIndex = MONOSPACE;
         }
 
+        if ((inputType & InputType.TYPE_TEXT_FLAG_LOCALIZED_DIGITS)
+                == InputType.TYPE_TEXT_FLAG_LOCALIZED_DIGITS)
+            setTransformationMethod(LocalizedDigitsTransformationMethod.getInstance());
+
         setTypefaceByIndex(typefaceIndex, styleIndex);
 
         if (shadowcolor != 0) {
@@ -1357,6 +1365,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     public void setCompoundDrawables(Drawable left, Drawable top,
                                      Drawable right, Drawable bottom) {
         Drawables dr = mDrawables;
+
+        if (mRTL) {
+            Drawable temp = left;
+            left = right;
+            right = temp;
+        }
 
         final boolean drawables = left != null || top != null
                 || right != null || bottom != null;
@@ -2794,7 +2808,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         public void drawText(Canvas c, int start, int end,
                              float x, float y, Paint p) {
-            c.drawText(mChars, start + mStart, end - start, x, y, p,false);
+            c.drawText(mChars, start + mStart, end - start, x, y, p);
         }
 
         public float measureText(int start, int end, Paint p) {
@@ -2899,6 +2913,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         final boolean isPassword = isPasswordInputType(type);
         final boolean isVisiblePassword = isVisiblePasswordInputType(type);
         boolean forceUpdate = false;
+
+        if ((type & InputType.TYPE_TEXT_FLAG_LOCALIZED_DIGITS)
+                == InputType.TYPE_TEXT_FLAG_LOCALIZED_DIGITS)
+            setTransformationMethod(LocalizedDigitsTransformationMethod.getInstance());
+
         if (isPassword) {
             setTransformationMethod(PasswordTransformationMethod.getInstance());
             setTypefaceByIndex(MONOSPACE, 0);
@@ -5401,12 +5420,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      */
     private boolean bringTextIntoView() {
         int line = 0;
+        boolean rtl = isRTLText();
         if ((mGravity & Gravity.VERTICAL_GRAVITY_MASK) == Gravity.BOTTOM) {
             line = mLayout.getLineCount() - 1;
         }
 
         Layout.Alignment a = mLayout.getParagraphAlignment(line);
-        int dir = mLayout.getParagraphDirection(line);
         int hspace = mRight - mLeft - getCompoundPaddingLeft() - getCompoundPaddingRight();
         int vspace = mBottom - mTop - getExtendedPaddingTop() - getExtendedPaddingBottom();
         int ht = mLayout.getHeight();
@@ -5425,7 +5444,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             if (right - left < hspace) {
                 scrollx = (right + left) / 2 - hspace / 2;
             } else {
-                if (dir < 0) {
+                if (rtl) {
                     scrollx = right - hspace;
                 } else {
                     scrollx = left;
@@ -5436,23 +5455,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
              * Keep leading edge in view.
              */
 
-            if (dir < 0) {
-                int right = (int) FloatMath.ceil(mLayout.getLineRight(line));
-                scrollx = right - hspace;
-            } else {
-                scrollx = (int) FloatMath.floor(mLayout.getLineLeft(line));
-            }
+            scrollx = (int) FloatMath.floor(mLayout.getLineLeft(line));
         } else /* a == Layout.Alignment.ALIGN_OPPOSITE */ {
             /*
              * Keep trailing edge in view.
              */
 
-            if (dir < 0) {
-                scrollx = (int) FloatMath.floor(mLayout.getLineLeft(line));
-            } else {
-                int right = (int) FloatMath.ceil(mLayout.getLineRight(line));
-                scrollx = right - hspace;
-            }
+            int right = (int) FloatMath.ceil(mLayout.getLineRight(line));
+            scrollx = right - hspace;
         }
 
         if (ht < vspace) {
@@ -5505,8 +5515,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             default:
                 grav = 0;
         }
-
-        grav *= mLayout.getParagraphDirection(line);
 
         int hspace = mRight - mLeft - getCompoundPaddingLeft() - getCompoundPaddingRight();
         int vspace = mBottom - mTop - getExtendedPaddingTop() - getExtendedPaddingBottom();
@@ -5950,6 +5958,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         private float mFadeStop;
         private int mRepeatLimit;
 
+        private boolean mRTL;
+
         float mScroll;
 
         Marquee(TextView v) {
@@ -5988,12 +5998,23 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
             final TextView textView = mView.get();
             if (textView != null && (textView.isFocused() || textView.isSelected())) {
-                mScroll += mScrollUnit;
-                if (mScroll > mMaxScroll) {
-                    mScroll = mMaxScroll;
-                    sendEmptyMessageDelayed(MESSAGE_RESTART, MARQUEE_RESTART_DELAY);
+                mRTL = textView.isRTLText();
+                if (mRTL) {
+                    mScroll -= mScrollUnit;
+                    if (mScroll < mMaxScroll) {
+                        mScroll = mMaxScroll;
+                        sendEmptyMessageDelayed(MESSAGE_RESTART, MARQUEE_RESTART_DELAY);
+                    } else {
+                        sendEmptyMessageDelayed(MESSAGE_TICK, MARQUEE_RESOLUTION);
+                    }
                 } else {
-                    sendEmptyMessageDelayed(MESSAGE_TICK, MARQUEE_RESOLUTION);
+                    mScroll += mScrollUnit;
+                    if (mScroll > mMaxScroll) {
+                        mScroll = mMaxScroll;
+                        sendEmptyMessageDelayed(MESSAGE_RESTART, MARQUEE_RESTART_DELAY);
+                    } else {
+                        sendEmptyMessageDelayed(MESSAGE_TICK, MARQUEE_RESOLUTION);
+                    }
                 }
                 textView.invalidate();
             }
@@ -6027,11 +6048,20 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         textView.getCompoundPaddingRight();
                 final float lineWidth = textView.mLayout.getLineWidth(0);
                 final float gap = textWidth / 3.0f;
-                mGhostStart = lineWidth - textWidth + gap;
-                mMaxScroll = mGhostStart + textWidth;
-                mGhostOffset = lineWidth + gap;
-                mFadeStop = lineWidth + textWidth / 6.0f;
-                mMaxFadeScroll = mGhostStart + lineWidth + lineWidth;
+                mRTL = textView.isRTLText();
+                if (mRTL) {
+                    mGhostStart = -(lineWidth - textWidth + gap);
+                    mMaxScroll = mGhostStart - textWidth;
+                    mGhostOffset = -(lineWidth + gap);
+                    mFadeStop = -(lineWidth + textWidth / 6.0f);
+                    mMaxFadeScroll = mGhostStart - lineWidth - lineWidth;
+                } else {
+                    mGhostStart = lineWidth - textWidth + gap;
+                    mMaxScroll = mGhostStart + textWidth;
+                    mGhostOffset = lineWidth + gap;
+                    mFadeStop = lineWidth + textWidth / 6.0f;
+                    mMaxFadeScroll = mGhostStart + lineWidth + lineWidth;
+                }
 
                 textView.invalidate();
                 sendEmptyMessageDelayed(MESSAGE_START, MARQUEE_DELAY);
@@ -6043,11 +6073,19 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
 
         boolean shouldDrawLeftFade() {
-            return mScroll <= mFadeStop;
+            if (mRTL) {
+                return mScroll >= mFadeStop;
+            } else {
+                return mScroll <= mFadeStop;
+            }
         }
 
         boolean shouldDrawGhost() {
-            return mStatus == MARQUEE_RUNNING && mScroll > mGhostStart;
+            if (mRTL) {
+                return mStatus == MARQUEE_RUNNING && mScroll < mGhostStart;
+            } else {
+                return mStatus == MARQUEE_RUNNING && mScroll > mGhostStart;
+            }
         }
 
         boolean isRunning() {
@@ -6709,24 +6747,46 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     @Override
     protected float getLeftFadingEdgeStrength() {
+        boolean rtl = isRTLText();
         if (mEllipsize == TextUtils.TruncateAt.MARQUEE) {
             if (mMarquee != null && !mMarquee.isStopped()) {
                 final Marquee marquee = mMarquee;
-                if (marquee.shouldDrawLeftFade()) {
-                    return marquee.mScroll / getHorizontalFadingEdgeLength();
+                if (rtl) {
+                    return (-marquee.mMaxFadeScroll + marquee.mScroll) / getHorizontalFadingEdgeLength();
                 } else {
-                    return 0.0f;
+                    if (marquee.shouldDrawLeftFade()) {
+                        return marquee.mScroll / getHorizontalFadingEdgeLength();
+                    } else {
+                        return 0.0f;
+                    }
                 }
             } else if (getLineCount() == 1) {
                 switch (mGravity & Gravity.HORIZONTAL_GRAVITY_MASK) {
                     case Gravity.LEFT:
-                        return 0.0f;
+                        if (rtl) {
+                            final int textWidth = (mRight - mLeft) - getCompoundPaddingLeft() -
+                                getCompoundPaddingRight();
+                            final float lineWidth = mLayout.getLineWidth(0);
+                            return (lineWidth - textWidth) / getHorizontalFadingEdgeLength();
+                        } else {
+                            return 0.0f;
+                        }
                     case Gravity.RIGHT:
-                        return (mLayout.getLineRight(0) - (mRight - mLeft) -
-                                getCompoundPaddingLeft() - getCompoundPaddingRight() -
-                                mLayout.getLineLeft(0)) / getHorizontalFadingEdgeLength();
+                        if (rtl) {
+                            return 0.0f;
+                        } else {
+                            return (mLayout.getLineRight(0) - (mRight - mLeft) -
+                                    getCompoundPaddingLeft() - getCompoundPaddingRight() -
+                                    mLayout.getLineLeft(0)) / getHorizontalFadingEdgeLength();
+                        }
                     case Gravity.CENTER_HORIZONTAL:
-                        return 0.0f;
+                        if (rtl) {
+                            return (mLayout.getLineWidth(0) - ((mRight - mLeft) -
+                                    getCompoundPaddingLeft() - getCompoundPaddingRight())) /
+                                    getHorizontalFadingEdgeLength();
+                        } else {
+                            return 0.0f;
+                        }
                 }
             }
         }
@@ -6735,23 +6795,46 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     @Override
     protected float getRightFadingEdgeStrength() {
+        boolean rtl = isRTLText();
         if (mEllipsize == TextUtils.TruncateAt.MARQUEE) {
             if (mMarquee != null && !mMarquee.isStopped()) {
                 final Marquee marquee = mMarquee;
-                return (marquee.mMaxFadeScroll - marquee.mScroll) / getHorizontalFadingEdgeLength();
+                if (rtl) {
+                    if (marquee.shouldDrawLeftFade()) {
+                        return -marquee.mScroll / getHorizontalFadingEdgeLength();
+                    } else {
+                        return 0.0f;
+                    }
+                } else {
+                    return (marquee.mMaxFadeScroll - marquee.mScroll) / getHorizontalFadingEdgeLength();
+                }
             } else if (getLineCount() == 1) {
                 switch (mGravity & Gravity.HORIZONTAL_GRAVITY_MASK) {
                     case Gravity.LEFT:
-                        final int textWidth = (mRight - mLeft) - getCompoundPaddingLeft() -
-                                getCompoundPaddingRight();
-                        final float lineWidth = mLayout.getLineWidth(0);
-                        return (lineWidth - textWidth) / getHorizontalFadingEdgeLength();
+                        if (rtl) {
+                            return 0.0f;
+                        } else {
+                            final int textWidth = (mRight - mLeft) - getCompoundPaddingLeft() -
+                                    getCompoundPaddingRight();
+                            final float lineWidth = mLayout.getLineWidth(0);
+                            return (lineWidth - textWidth) / getHorizontalFadingEdgeLength();
+                        }
                     case Gravity.RIGHT:
-                        return 0.0f;
+                        if (rtl) {
+                            return (mLayout.getLineRight(0) - (mRight - mLeft) -
+                                    getCompoundPaddingLeft() - getCompoundPaddingRight() -
+                                    mLayout.getLineLeft(0)) / getHorizontalFadingEdgeLength();
+                        } else {
+                            return 0.0f;
+                        }
                     case Gravity.CENTER_HORIZONTAL:
-                        return (mLayout.getLineWidth(0) - ((mRight - mLeft) -
-                                getCompoundPaddingLeft() - getCompoundPaddingRight())) /
-                                getHorizontalFadingEdgeLength();
+                        if (rtl) {
+                            return 0.0f;
+                        } else {
+                            return (mLayout.getLineWidth(0) - ((mRight - mLeft) -
+                                    getCompoundPaddingLeft() - getCompoundPaddingRight())) /
+                                    getHorizontalFadingEdgeLength();
+                        }
                 }
             }
         }
@@ -7345,6 +7428,22 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         return false;
     }
 
+    public boolean isRTLText() {
+    	if (mLayout != null)
+    		mRTLText = mLayout.isRTLText();
+    	else
+    		return false;
+    	return mRTLText;
+    }
+
+    public void mirroredOnce() {
+    	mMirroredOnce = true;
+    }
+    
+    public boolean beenMirroredOnce() {
+    	return mMirroredOnce;
+    }
+
     @ViewDebug.ExportedProperty
     private CharSequence            mText;
     private CharSequence            mTransformed;
@@ -7367,7 +7466,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private boolean                 mUserSetTextScaleX;
     private Paint                   mHighlightPaint;
     private int                     mHighlightColor = 0xFFBBDDFF;
-    private Layout                  mLayout;
+    protected Layout                mLayout;
 
     private long                    mShowCursor;
     private Blink                   mBlink;

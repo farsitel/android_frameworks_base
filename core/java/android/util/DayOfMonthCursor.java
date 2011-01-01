@@ -16,6 +16,9 @@
 
 package android.util;
 
+import android.text.format.Jalali;
+import android.text.format.JalaliDate;
+
 /**
  * Helps control and display a month view of a calendar that has a current
  * selected day.
@@ -37,6 +40,8 @@ public class DayOfMonthCursor extends MonthDisplayHelper {
     private int mRow;
     private int mColumn;
 
+    private boolean mJalali;
+
     /**
      * @param year The initial year.
      * @param month The initial month.
@@ -46,9 +51,19 @@ public class DayOfMonthCursor extends MonthDisplayHelper {
      *   {@link java.util.Calendar#SUNDAY}.
      */
     public DayOfMonthCursor(int year, int month, int dayOfMonth, int weekStartDay) {
-        super(year, month, weekStartDay);
-        mRow = getRowOf(dayOfMonth);
-        mColumn = getColumnOf(dayOfMonth);
+    	this(year, month, dayOfMonth, weekStartDay, false);
+    }
+    public DayOfMonthCursor(int year, int month, int dayOfMonth, int weekStartDay, boolean jalali) {
+        super(year, month, dayOfMonth, weekStartDay, jalali);
+        if (jalali) {
+            JalaliDate jalaliDate = Jalali.gregorianToJalali(year, month + 1, dayOfMonth);
+            mRow = getRowOf(jalaliDate.day);
+            mColumn = getColumnOf(jalaliDate.day);
+        } else {
+            mRow = getRowOf(dayOfMonth);
+            mColumn = getColumnOf(dayOfMonth);
+        }
+        mJalali = jalali;
     }
 
 
@@ -66,7 +81,7 @@ public class DayOfMonthCursor extends MonthDisplayHelper {
     }
 
     public int getSelectedDayOfMonth() {
-        return getDayAt(mRow, mColumn);
+   	    return getDayAt(mRow, mColumn, mJalali);
     }
 
     /**

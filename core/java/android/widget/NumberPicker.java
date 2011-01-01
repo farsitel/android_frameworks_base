@@ -33,6 +33,9 @@ import android.widget.TextView;
 import android.widget.LinearLayout;
 import android.widget.EditText;
 
+import java.util.HashMap;
+import java.util.Locale;
+
 import com.android.internal.R;
 
 /**
@@ -63,24 +66,58 @@ public class NumberPicker extends LinearLayout {
         String toString(int value);
     }
 
+    public static class OneArgFormatter implements NumberPicker.Formatter {
+        final StringBuilder mBuilder = new StringBuilder();
+        final java.util.Formatter mFmt;
+        final Object[] mArgs = new Object[1];
+        final String fmtStr;
+
+        public OneArgFormatter(String format, Locale l) {
+            this.fmtStr = format;
+            mFmt = new java.util.Formatter(mBuilder, l);
+        }
+
+        public String toString(int value) {
+            mArgs[0] = value;
+            mBuilder.delete(0, mBuilder.length());
+            mFmt.format(fmtStr, mArgs);
+            return mFmt.toString();
+        }
+    }
+
     /*
      * Use a custom NumberPicker formatting callback to use two-digit
      * minutes strings like "01".  Keeping a static formatter etc. is the
      * most efficient way to do this; it avoids creating temporary objects
      * on every call to format().
      */
-    public static final NumberPicker.Formatter TWO_DIGIT_FORMATTER =
-            new NumberPicker.Formatter() {
-                final StringBuilder mBuilder = new StringBuilder();
-                final java.util.Formatter mFmt = new java.util.Formatter(mBuilder);
-                final Object[] mArgs = new Object[1];
-                public String toString(int value) {
-                    mArgs[0] = value;
-                    mBuilder.delete(0, mBuilder.length());
-                    mFmt.format("%02d", mArgs);
-                    return mFmt.toString();
-                }
-        };
+    public static NumberPicker.Formatter getTwoDigitFormatter() {
+        Locale l = Locale.getDefault();
+        String localeCode = l.toString();
+        if (TWO_DIGIT_FORMATTERS.containsKey(localeCode))
+            return TWO_DIGIT_FORMATTERS.get(localeCode);
+        NumberPicker.Formatter numberPicker = new OneArgFormatter("%L02d", l);
+        TWO_DIGIT_FORMATTERS.put(localeCode, numberPicker);
+        return numberPicker;
+    };
+    private static HashMap<String, NumberPicker.Formatter> TWO_DIGIT_FORMATTERS =
+                    new HashMap<String, NumberPicker.Formatter>(3,1);
+
+    /*
+     * Use a simple NumberPicker formatting callback to use localized digits
+     */
+    public static NumberPicker.Formatter getSimpleFormatter() {
+        Locale l = Locale.getDefault();
+        String localeCode = l.toString();
+        if (SIMPLE_FORMATTERS.containsKey(localeCode))
+            return SIMPLE_FORMATTERS.get(localeCode);
+        NumberPicker.Formatter numberPicker = new OneArgFormatter("%Ld", l);
+        SIMPLE_FORMATTERS.put(localeCode, numberPicker);
+        return numberPicker;
+    };
+    private static HashMap<String, NumberPicker.Formatter> SIMPLE_FORMATTERS =
+                    new HashMap<String, NumberPicker.Formatter>(3,1);
+
 
     private final Handler mHandler;
     private final Runnable mRunnable = new Runnable() {
@@ -306,7 +343,7 @@ public class NumberPicker extends LinearLayout {
     private String formatNumber(int value) {
         return (mFormatter != null)
                 ? mFormatter.toString(value)
-                : String.valueOf(value);
+                : getSimpleFormatter().toString(value);
     }
 
     /**
@@ -400,7 +437,9 @@ public class NumberPicker extends LinearLayout {
     }
 
     private static final char[] DIGIT_CHARACTERS = new char[] {
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+        '\u06f0', '\u06f1', '\u06f2', '\u06f3', '\u06f4',
+        '\u06f5', '\u06f6', '\u06f7', '\u06f8', '\u06f9'
     };
 
     private NumberPickerButton mIncrementButton;

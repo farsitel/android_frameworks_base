@@ -53,6 +53,32 @@
     <string name="month_shortest_november">N</string>
     <string name="month_shortest_december">D</string>
 
+    <string name="month_long_farvardin">Farvardin</string>
+    <string name="month_long_ordibehesht">Ordibehesht</string>
+    <string name="month_long_khordad">Khordad</string>
+    <string name="month_long_tir">Tir</string>
+    <string name="month_long_mordad">Mordad</string>
+    <string name="month_long_shahrivar">Shahrivar</string>
+    <string name="month_long_mehr">Mehr</string>
+    <string name="month_long_aban">Aban</string>
+    <string name="month_long_azar">Azar</string>
+    <string name="month_long_dey">Dey</string>
+    <string name="month_long_bahman">Bahman</string>
+    <string name="month_long_esfand">Esfand</string>
+
+    <string name="month_shortest_farvardin">F</string>
+    <string name="month_shortest_ordibehesht">O</string>
+    <string name="month_shortest_khordad">K</string>
+    <string name="month_shortest_tir">T</string>
+    <string name="month_shortest_mordad">M</string>
+    <string name="month_shortest_shahrivar">S</string>
+    <string name="month_shortest_mehr">M</string>
+    <string name="month_shortest_aban">A</string>
+    <string name="month_shortest_azar">A</string>
+    <string name="month_shortest_dey">D</string>
+    <string name="month_shortest_bahman">B</string>
+    <string name="month_shortest_esfand">E</string>
+
     <string name="day_of_week_long_sunday">Sunday</string>
     <string name="day_of_week_long_monday">Monday</string>
     <string name="day_of_week_long_tuesday">Tuesday</string>
@@ -147,4 +173,7 @@
     <string name="short_format_month">%b</string>
     <string name="full_wday_month_day_no_year">EEEE, MMMM d</string>
     <string name="abbrev_wday_month_day_year">EEE, MMM d, yyyy</string>
+    
+    <string name="jalali_full_date">EEEE, d MMMM yyyy</string>
+    <string name="jalali_long_date">d MMMM yyyy</string>
 </resources>

@@ -1497,13 +1497,8 @@ public class EditStyledText extends EditText {
             int line = layout.getLineForOffset(end);
             if (line > 0) {
                 int to;
-                if (layout.getParagraphDirection(line) ==
-                    layout.getParagraphDirection(line - 1)) {
-                    float h = layout.getPrimaryHorizontal(end);
-                    to = layout.getOffsetForHorizontal(line - 1, h);
-                } else {
-                    to = layout.getLineStart(line - 1);
-                }
+                float h = layout.getPrimaryHorizontal(end);
+                to = layout.getOffsetForHorizontal(line - 1, h);
                 mManager.setSelectedEndPos(to);
                 mManager.onCursorMoved();
                 return true;
@@ -1520,13 +1515,8 @@ public class EditStyledText extends EditText {
             int line = layout.getLineForOffset(end);
             if (line < layout.getLineCount() - 1) {
                 int to;
-                if (layout.getParagraphDirection(line) ==
-                    layout.getParagraphDirection(line + 1)) {
-                    float h = layout.getPrimaryHorizontal(end);
-                    to = layout.getOffsetForHorizontal(line + 1, h);
-                } else {
-                    to = layout.getLineStart(line + 1);
-                }
+                float h = layout.getPrimaryHorizontal(end);
+                to = layout.getOffsetForHorizontal(line + 1, h);
                 mManager.setSelectedEndPos(to);
                 mManager.onCursorMoved();
                 return true;

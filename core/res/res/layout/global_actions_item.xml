@@ -18,6 +18,7 @@
     android:layout_width="match_parent"
     android:layout_height="?android:attr/listPreferredItemHeight"
 
+    android:paddingRight="11dip"
     android:paddingLeft="11dip"
     android:paddingTop="6dip"
     android:paddingBottom="6dip"
@@ -28,13 +29,14 @@
         android:layout_height="match_parent"
         android:layout_alignParentTop="true"
         android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
         android:layout_marginRight="9dip"
             />
 
 
     <TextView android:id="@+id/status"
         android:layout_width="match_parent"
-        android:layout_height="26dip"
+        android:layout_height="wrap_content"
 
         android:layout_toRightOf="@id/icon"
         android:layout_alignParentBottom="true"

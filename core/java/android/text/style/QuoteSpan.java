@@ -73,7 +73,7 @@ public class QuoteSpan implements LeadingMarginSpan, ParcelableSpan {
         p.setStyle(Paint.Style.FILL);
         p.setColor(mColor);
 
-        c.drawRect(x, top, x + dir * STRIPE_WIDTH, bottom, p);
+        c.drawRect(x, top, x + STRIPE_WIDTH, bottom, p);
 
         p.setStyle(style);
         p.setColor(color);

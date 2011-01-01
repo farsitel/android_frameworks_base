@@ -46,9 +46,6 @@ implements LeadingMarginSpan, LineHeightSpan
         int st = ((Spanned) text).getSpanStart(this);
         int itop = layout.getLineTop(layout.getLineForOffset(st));
 
-        if (dir < 0)
-            x -= mBitmap.getWidth();
-
         c.drawBitmap(mBitmap, x, itop, p);
     }
 

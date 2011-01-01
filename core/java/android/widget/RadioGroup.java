@@ -220,7 +220,7 @@ public class RadioGroup extends LinearLayout {
      */
     @Override
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new RadioGroup.LayoutParams(getContext(), attrs);
+        return new RadioGroup.LayoutParams(getContext(), attrs, mRTL);
     }
 
     /**
@@ -250,8 +250,13 @@ public class RadioGroup extends LinearLayout {
         /**
          * {@inheritDoc}
          */
+        @Deprecated
         public LayoutParams(Context c, AttributeSet attrs) {
-            super(c, attrs);
+            this(c, attrs, false);
+        }
+
+        public LayoutParams(Context c, AttributeSet attrs, boolean rtl) {
+            super(c, attrs, rtl);
         }
 
         /**

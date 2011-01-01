@@ -1225,6 +1225,9 @@
         android:description="@string/permlab_copyProtectedData"
         android:protectionLevel="signature" />
 
+    <permission android:name="android.webkit.permission.PLUGIN"
+        android:protectionLevel="normal" />
+
     <!-- C2DM permission. 
          @hide Used internally.
      -->

@@ -70,6 +70,7 @@ public abstract class Layout {
     /**
      * Return how wide a layout must be in order to display the
      * specified text slice with one line per paragraph.
+     * Gets not FriBidized CharSequences
      */
     public static float getDesiredWidth(CharSequence source,
                                         int start, int end,
@@ -86,7 +87,8 @@ public abstract class Layout {
 
             // note, omits trailing paragraph char
             float w = measureText(paint, workPaint,
-                                  source, i, next, null, true, null);
+                                  source, new FriBidi(source),
+                                  i, next, null, true, null);
 
             if (w > need)
                 need = w;
@@ -116,11 +118,25 @@ public abstract class Layout {
         if (width < 0)
             throw new IllegalArgumentException("Layout: " + width + " < 0");
 
-        mText = text;
+        mRTLText = false;
+        mOriginalText = text;
+        mFriBidi = new FriBidi(mOriginalText);
+        if ((mFriBidi.direction == FriBidi.PARAGRAPH_DIRECTION_RTL) ||
+                (mFriBidi.direction == FriBidi.PARAGRAPH_DIRECTION_WRTL))
+            mRTLText = true;
+
+        mRTLUI = FriBidi.isRTL();
+
         mPaint = paint;
         mWorkPaint = new TextPaint();
         mWidth = width;
-        mAlignment = align;
+        mOriginalAlignment = mAlignment = align;
+        if (mRTLText) {
+            if (mOriginalAlignment == Alignment.ALIGN_NORMAL)
+                mAlignment = Alignment.ALIGN_OPPOSITE;
+            else if (mOriginalAlignment == Alignment.ALIGN_OPPOSITE)
+                mAlignment = Alignment.ALIGN_NORMAL;
+        }
         mSpacingMult = spacingMult;
         mSpacingAdd = spacingAdd;
         mSpannedText = text instanceof Spanned;
@@ -136,10 +152,21 @@ public abstract class Layout {
             throw new IllegalArgumentException("Layout: " + width + " < 0");
         }
 
-        mText = text;
+        mOriginalText = text;
+        mFriBidi = new FriBidi(mOriginalText);
+        if ((mFriBidi.direction == FriBidi.PARAGRAPH_DIRECTION_RTL) ||
+                (mFriBidi.direction == FriBidi.PARAGRAPH_DIRECTION_WRTL))
+            mRTLText = true;
+
         mPaint = paint;
         mWidth = width;
-        mAlignment = align;
+        mOriginalAlignment = mAlignment = align;
+        if (mRTLText) {
+            if (mOriginalAlignment == Alignment.ALIGN_NORMAL)
+                mAlignment = Alignment.ALIGN_OPPOSITE;
+            else if (mOriginalAlignment == Alignment.ALIGN_OPPOSITE)
+                mAlignment = Alignment.ALIGN_NORMAL;
+        }
         mSpacingMult = spacingmult;
         mSpacingAdd = spacingadd;
         mSpannedText = text instanceof Spanned;
@@ -193,7 +220,7 @@ public abstract class Layout {
         int previousLineEnd = getLineStart(first);
         
         TextPaint paint = mPaint;
-        CharSequence buf = mText;
+        CharSequence buf = mOriginalText;
         int width = mWidth;
         boolean spannedText = mSpannedText;
 
@@ -217,7 +244,7 @@ public abstract class Layout {
                 int lbaseline = lbottom - getLineDescent(i);
 
                 if (start >= spanend) {
-                   Spanned sp = (Spanned) buf;
+                   Spanned sp = (Spanned) mOriginalText;
                    spanend = sp.nextSpanTransition(start, textLength,
                                                    LineBackgroundSpan.class);
                    spans = sp.getSpans(start, spanend,
@@ -278,7 +305,9 @@ public abstract class Layout {
                 // New batch of paragraph styles, compute the alignment.
                 // Last alignment style wins.
                 if (start >= spanend) {
-                    Spanned sp = (Spanned) buf;
+
+                    Spanned sp = (Spanned) mOriginalText;
+
                     spanend = sp.nextSpanTransition(start, textLength,
                                                     ParagraphStyle.class);
                     spans = sp.getSpans(start, spanend, ParagraphStyle.class);
@@ -293,35 +322,35 @@ public abstract class Layout {
                 }
             }
             
-            int dir = getParagraphDirection(i);
             int left = 0;
             int right = mWidth;
 
             // Draw all leading margin spans.  Adjust left or right according
-            // to the paragraph direction of the line.
+            // NOT to the paragraph direction of the line.
+            // to UI direction! because leading margin is related to external
+            // UI objects.
             if (spannedText) {
                 final int length = spans.length;
                 for (int n = 0; n < length; n++) {
                     if (spans[n] instanceof LeadingMarginSpan) {
                         LeadingMarginSpan margin = (LeadingMarginSpan) spans[n];
 
-                       // if (dir == DIR_RIGHT_TO_LEFT) {
-                       //     margin.drawLeadingMargin(c, paint, right, dir, ltop,
-                         //                            lbaseline, lbottom, buf,
-                          //                           start, end, isFirstParaLine, this);
-                          //      
-                         //   right -= margin.getLeadingMargin(isFirstParaLine);
-                        //} else {
-                            margin.drawLeadingMargin(c, paint, left, dir, ltop,
-                                                     lbaseline, lbottom, buf,
+                        boolean useMargin = isFirstParaLine;
+                        if (margin instanceof LeadingMarginSpan.LeadingMarginSpan2) {
+                            int count = ((LeadingMarginSpan.LeadingMarginSpan2)margin).getLeadingMarginLineCount();
+                            useMargin = count > i;
+                        }
+                        if (mRTLUI) {
+                            margin.drawLeadingMargin(c, paint, right, DIR_RIGHT_TO_LEFT, ltop,
+                                                     lbaseline, lbottom, mOriginalText,
                                                      start, end, isFirstParaLine, this);
-
-                            boolean useMargin = isFirstParaLine;
-                            if (margin instanceof LeadingMarginSpan.LeadingMarginSpan2) {
-                                int count = ((LeadingMarginSpan.LeadingMarginSpan2)margin).getLeadingMarginLineCount();
-                                useMargin = count > i;
-                          //  }
-                            left += margin.getLeadingMargin(useMargin);
+                            right -= margin.getLeadingMargin(useMargin);
+                        } else {
+	                        margin.drawLeadingMargin(c, paint, left, DIR_LEFT_TO_RIGHT, ltop,
+	                                                 lbaseline, lbottom, mOriginalText,
+	                                                 start, end, isFirstParaLine, this);
+	
+	                        left += margin.getLeadingMargin(useMargin);
                         }
                     }
                 }
@@ -331,43 +360,28 @@ public abstract class Layout {
             // alignment of the paragraph.
             int x;
             if (align == Alignment.ALIGN_NORMAL) {
-                if (dir == DIR_LEFT_TO_RIGHT) {
-                    x = left;
-                } else {
-                    x = right;
-                }
+                x = left;
             } else {
                 int max = (int)getLineMax(i, spans, false);
                 if (align == Alignment.ALIGN_OPPOSITE) {
-                    if (dir == DIR_RIGHT_TO_LEFT) {
-                        x = left + max;
-                    } else {
                         x = right - max;
-                    }
                 } else {
                     // Alignment.ALIGN_CENTER
                     max = max & ~1;
                     int half = (right - left - max) >> 1;
-                    if (dir == DIR_RIGHT_TO_LEFT) {
-                        x = right - half;
-                    } else {
-                        x = left + half;
-                    }
+                    x = left + half;
                 }
             }
 
-            Directions directions = getLineDirections(i);
             boolean hasTab = getLineContainsTab(i);
-            if (directions == DIRS_ALL_LEFT_TO_RIGHT &&
-                    !spannedText && !hasTab) {
+            if (!spannedText && !hasTab) {
                 if (DEBUG) {
-                    Assert.assertTrue(dir == DIR_LEFT_TO_RIGHT);
                     Assert.assertNotNull(c);
                 }
-                c.drawText(buf, start, end, x, lbaseline, paint,false);
+                // XXX: assumes there's nothing additional to be done
+                c._drawText(mFriBidi.str, start, end, x, lbaseline, paint);
             } else {
-                drawText(c, buf, start, end, dir, directions,
-                    x, ltop, lbaseline, lbottom, paint, mWorkPaint,
+                drawText(c, buf, mFriBidi, start, end, x, ltop, lbaseline, lbottom, paint, mWorkPaint,
                     hasTab, spans);
             }
         }
@@ -377,7 +391,7 @@ public abstract class Layout {
      * Return the text that is displayed by this Layout.
      */
     public final CharSequence getText() {
-        return mText;
+        return mFriBidi.before_reorder;
     }
 
     /**
@@ -493,7 +507,10 @@ public abstract class Layout {
      * specified line, either 1 for left-to-right lines, or -1 for right-to-left
      * lines (see {@link #DIR_LEFT_TO_RIGHT}, {@link #DIR_RIGHT_TO_LEFT}).
      */
-    public abstract int getParagraphDirection(int line);
+    @Deprecated
+    public int getParagraphDirection(int line) {
+        return DIR_LEFT_TO_RIGHT;
+    }
 
     /**
      * Returns whether the specified line contains one or more
@@ -509,7 +526,10 @@ public abstract class Layout {
      *
      * <p>NOTE: this is inadequate to support bidirectional text, and will change.
      */
-    public abstract Directions getLineDirections(int line);
+    @Deprecated
+    public Directions getLineDirections(int line) {
+        return DIRS_ALL_LEFT_TO_RIGHT;
+    }
 
     /**
      * Returns the (negative) number of extra pixels of ascent padding in the
@@ -551,50 +571,64 @@ public abstract class Layout {
                                 int line) {
         int start = getLineStart(line);
         int end = getLineVisibleEnd(line);
-        int dir = getParagraphDirection(line);
         boolean tab = getLineContainsTab(line);
-        Directions directions = getLineDirections(line);
 
         TabStopSpan[] tabs = null;
-        if (tab && mText instanceof Spanned) {
-            tabs = ((Spanned) mText).getSpans(start, end, TabStopSpan.class);
+        if (tab && mOriginalText instanceof Spanned) {
+            tabs = ((Spanned) mOriginalText).getSpans(start, end, TabStopSpan.class);
         }
 
-        float wid = measureText(mPaint, mWorkPaint, mText, start, offset, end,
-                                dir, directions, trailing, alt, tab, tabs);
+        float wid = 0;
+        float rtlWid = 0;
+        int rtlOffset = offset;
+        if (mRTLText) {
+            int i;
+            for(i = 0; i < mFriBidi.logical_to_visual.length; i++) {
+                if (mFriBidi.logical_to_visual[i] == (offset - 1)) {
+                    break;
+                }
+            }
+            rtlOffset = i;
+            rtlWid = measureText(mPaint, mWorkPaint, mOriginalText, mFriBidi, start, rtlOffset, end,
+                    trailing, alt, tab, tabs);
+        } else {
+            wid = measureText(mPaint, mWorkPaint, mOriginalText, mFriBidi, start, offset, end,
+                                    trailing, alt, tab, tabs);
+        }
 
         if (offset > end) {
-            if (dir == DIR_RIGHT_TO_LEFT)
-                wid -= measureText(mPaint, mWorkPaint,
-                                   mText, end, offset, null, tab, tabs);
-            else
-                wid += measureText(mPaint, mWorkPaint,
-                                   mText, end, offset, null, tab, tabs);
+            if (mRTLText) {
+                rtlWid += measureText(mPaint, mWorkPaint, mOriginalText, mFriBidi,
+                        end, offset, null, tab, tabs);
+            } else {
+                wid += measureText(mPaint, mWorkPaint, mOriginalText, mFriBidi,
+                                   end, offset, null, tab, tabs);
+            }
         }
 
         Alignment align = getParagraphAlignment(line);
         int left = getParagraphLeft(line);
         int right = getParagraphRight(line);
 
+        float max = getLineMax(line);
+
         if (align == Alignment.ALIGN_NORMAL) {
-            if (dir == DIR_RIGHT_TO_LEFT)
-                return right + wid;
+            if (mRTLText)
+                return left + max - rtlWid;
             else
                 return left + wid;
         }
 
-        float max = getLineMax(line);
-
         if (align == Alignment.ALIGN_OPPOSITE) {
-            if (dir == DIR_RIGHT_TO_LEFT)
-                return left + max + wid;
+            if (mRTLText)
+                return right - max + rtlWid;
             else
                 return right - max + wid;
         } else { /* align == Alignment.ALIGN_CENTER */
             int imax = ((int) max) & ~1;
 
-            if (dir == DIR_RIGHT_TO_LEFT)
-                return right - (((right - left) - imax) / 2) + wid;
+            if (mRTLText)
+                return left + ((right - left) - imax) / 2 + rtlWid;
             else
                 return left + ((right - left) - imax) / 2 + wid;
         }
@@ -605,19 +639,12 @@ public abstract class Layout {
      * scrolling on the specified line.
      */
     public float getLineLeft(int line) {
-        int dir = getParagraphDirection(line);
         Alignment align = getParagraphAlignment(line);
 
         if (align == Alignment.ALIGN_NORMAL) {
-            if (dir == DIR_RIGHT_TO_LEFT)
-                return getParagraphRight(line) - getLineMax(line);
-            else
-                return 0;
+            return 0;
         } else if (align == Alignment.ALIGN_OPPOSITE) {
-            if (dir == DIR_RIGHT_TO_LEFT)
-                return 0;
-            else
-                return mWidth - getLineMax(line);
+            return mWidth - getLineMax(line);
         } else { /* align == Alignment.ALIGN_CENTER */
             int left = getParagraphLeft(line);
             int right = getParagraphRight(line);
@@ -632,19 +659,12 @@ public abstract class Layout {
      * scrolling on the specified line.
      */
     public float getLineRight(int line) {
-        int dir = getParagraphDirection(line);
         Alignment align = getParagraphAlignment(line);
 
         if (align == Alignment.ALIGN_NORMAL) {
-            if (dir == DIR_RIGHT_TO_LEFT)
-                return mWidth;
-            else
-                return getParagraphLeft(line) + getLineMax(line);
+            return getParagraphLeft(line) + getLineMax(line);
         } else if (align == Alignment.ALIGN_OPPOSITE) {
-            if (dir == DIR_RIGHT_TO_LEFT)
-                return getLineMax(line);
-            else
-                return mWidth;
+            return mWidth;
         } else { /* align == Alignment.ALIGN_CENTER */
             int left = getParagraphLeft(line);
             int right = getParagraphRight(line);
@@ -681,12 +701,12 @@ public abstract class Layout {
         } 
         boolean tab = getLineContainsTab(line);
 
-        if (tabs == null && tab && mText instanceof Spanned) {
-            tabs = ((Spanned) mText).getSpans(start, end, TabStopSpan.class);
+        if (tabs == null && tab && mOriginalText instanceof Spanned) {
+            tabs = ((Spanned) mOriginalText).getSpans(start, end, TabStopSpan.class);
         }
 
-        return measureText(mPaint, mWorkPaint,
-                           mText, start, end, null, tab, tabs);
+        return measureText(mPaint, mWorkPaint, mOriginalText, mFriBidi,
+                           start, end, null, tab, tabs);
     }
 
     /**
@@ -743,69 +763,50 @@ public abstract class Layout {
     public int getOffsetForHorizontal(int line, float horiz) {
         int max = getLineEnd(line) - 1;
         int min = getLineStart(line);
-        Directions dirs = getLineDirections(line);
 
         if (line == getLineCount() - 1)
             max++;
 
         if (line != getLineCount() - 1)
-            max = TextUtils.getOffsetBefore(mText, getLineEnd(line));
+            max = TextUtils.getOffsetBefore(mOriginalText, getLineEnd(line));
 
         int best = min;
         float bestdist = Math.abs(getPrimaryHorizontal(best) - horiz);
 
-        int here = min;
-        for (int i = 0; i < dirs.mDirections.length; i++) {
-            int there = here + dirs.mDirections[i];
-            int swap = ((i & 1) == 0) ? 1 : -1;
+        int high = max - 1 + 1, low = min + 1 - 1, guess;
+        
+        while (high - low > 1) {
+            guess = (high + low) / 2;
+            int adguess = getOffsetAtStartOf(guess);
 
-            if (there > max)
-                there = max;
+            if (getPrimaryHorizontal(adguess) >= horiz)
+                high = guess;
+            else
+                low = guess;
+        }
 
-            int high = there - 1 + 1, low = here + 1 - 1, guess;
+        if (low < min + 1)
+            low = min + 1;
 
-            while (high - low > 1) {
-                guess = (high + low) / 2;
-                int adguess = getOffsetAtStartOf(guess);
+        if (low < max) {
+            low = getOffsetAtStartOf(low);
 
-                if (getPrimaryHorizontal(adguess) * swap >= horiz * swap)
-                    high = guess;
-                else
-                    low = guess;
-            }
+            float dist = Math.abs(getPrimaryHorizontal(low) - horiz);
 
-            if (low < here + 1)
-                low = here + 1;
+            int aft = TextUtils.getOffsetAfter(mFriBidi.str, low);
+            if (aft < max) {
+                float other = Math.abs(getPrimaryHorizontal(aft) - horiz);
 
-            if (low < there) {
-                low = getOffsetAtStartOf(low);
-
-                float dist = Math.abs(getPrimaryHorizontal(low) - horiz);
-
-                int aft = TextUtils.getOffsetAfter(mText, low);
-                if (aft < there) {
-                    float other = Math.abs(getPrimaryHorizontal(aft) - horiz);
-
-                    if (other < dist) {
-                        dist = other;
-                        low = aft;
-                    }
-                }
-
-                if (dist < bestdist) {
-                    bestdist = dist;
-                    best = low;   
+                if (other < dist) {
+                    dist = other;
+                    low = aft;
                 }
             }
-
-            float dist = Math.abs(getPrimaryHorizontal(here) - horiz);
 
             if (dist < bestdist) {
                 bestdist = dist;
-                best = here;
+                best = low;
             }
-
-            here = there;
         }
 
         float dist = Math.abs(getPrimaryHorizontal(max) - horiz);
@@ -838,7 +839,7 @@ public abstract class Layout {
             Assert.assertTrue(getLineStart(line) == start && getLineStart(line+1) == end);
         }
 
-        CharSequence text = mText;
+        CharSequence text = mFriBidi.str;
         char ch;
         if (line == getLineCount() - 1) {
             return end;
@@ -892,10 +893,9 @@ public abstract class Layout {
         int line = getLineForOffset(offset);
         int start = getLineStart(line);
         int end = getLineEnd(line);
-        Directions dirs = getLineDirections(line);
 
         if (line != getLineCount() - 1)
-            end = TextUtils.getOffsetBefore(mText, end);
+            end = TextUtils.getOffsetBefore(mOriginalText, end);
 
         float horiz = getPrimaryHorizontal(offset);
 
@@ -903,7 +903,7 @@ public abstract class Layout {
         float besth = Integer.MIN_VALUE;
         int candidate;
 
-        candidate = TextUtils.getOffsetBefore(mText, offset);
+        candidate = TextUtils.getOffsetBefore(mOriginalText, offset);
         if (candidate >= start && candidate <= end) {
             float h = getPrimaryHorizontal(candidate);
 
@@ -913,7 +913,7 @@ public abstract class Layout {
             }
         }
 
-        candidate = TextUtils.getOffsetAfter(mText, offset);
+        candidate = TextUtils.getOffsetAfter(mFriBidi.str, offset);
         if (candidate >= start && candidate <= end) {
             float h = getPrimaryHorizontal(candidate);
 
@@ -923,43 +923,34 @@ public abstract class Layout {
             }
         }
 
-        int here = start;
-        for (int i = 0; i < dirs.mDirections.length; i++) {
-            int there = here + dirs.mDirections[i];
-            if (there > end)
-                there = end;
+        float h = getPrimaryHorizontal(start);
 
-            float h = getPrimaryHorizontal(here);
-
-            if (h < horiz && h > besth) {
-                best = here;
-                besth = h;
-            }
-
-            candidate = TextUtils.getOffsetAfter(mText, here);
-            if (candidate >= start && candidate <= end) {
-                h = getPrimaryHorizontal(candidate);
-
-                if (h < horiz && h > besth) {
-                    best = candidate;
-                    besth = h;
-                }
-            }
-
-            candidate = TextUtils.getOffsetBefore(mText, there);
-            if (candidate >= start && candidate <= end) {
-                h = getPrimaryHorizontal(candidate);
-
-                if (h < horiz && h > besth) {
-                    best = candidate;
-                    besth = h;
-                }
-            }
-
-            here = there;
+        if (h < horiz && h > besth) {
+            best = start;
+            besth = h;
         }
 
-        float h = getPrimaryHorizontal(end);
+        candidate = TextUtils.getOffsetAfter(mFriBidi.str, start);
+        if (candidate >= start && candidate <= end) {
+            h = getPrimaryHorizontal(candidate);
+
+            if (h < horiz && h > besth) {
+                best = candidate;
+                besth = h;
+            }
+        }
+
+        candidate = TextUtils.getOffsetBefore(mOriginalText, end);
+        if (candidate >= start && candidate <= end) {
+            h = getPrimaryHorizontal(candidate);
+
+            if (h < horiz && h > besth) {
+                best = candidate;
+                besth = h;
+            }
+        }
+
+        h = getPrimaryHorizontal(end);
 
         if (h < horiz && h > besth) {
             best = end;
@@ -969,19 +960,10 @@ public abstract class Layout {
         if (best != offset)
             return best;
 
-        int dir = getParagraphDirection(line);
-
-        if (dir > 0) {
-            if (line == 0)
-                return best;
-            else
-                return getOffsetForHorizontal(line - 1, 10000);
-        } else {
-            if (line == getLineCount() - 1)
-                return best;
-            else
-                return getOffsetForHorizontal(line + 1, 10000);
-        }
+        if (line == 0)
+            return best;
+        else
+            return getOffsetForHorizontal(line - 1, 10000);
     }
 
     /**
@@ -992,10 +974,8 @@ public abstract class Layout {
         int line = getLineForOffset(offset);
         int start = getLineStart(line);
         int end = getLineEnd(line);
-        Directions dirs = getLineDirections(line);
-
         if (line != getLineCount() - 1)
-            end = TextUtils.getOffsetBefore(mText, end);
+            end = TextUtils.getOffsetBefore(mOriginalText, end);
 
         float horiz = getPrimaryHorizontal(offset);
 
@@ -1003,7 +983,7 @@ public abstract class Layout {
         float besth = Integer.MAX_VALUE;
         int candidate;
 
-        candidate = TextUtils.getOffsetBefore(mText, offset);
+        candidate = TextUtils.getOffsetBefore(mOriginalText, offset);
         if (candidate >= start && candidate <= end) {
             float h = getPrimaryHorizontal(candidate);
 
@@ -1013,7 +993,7 @@ public abstract class Layout {
             }
         }
 
-        candidate = TextUtils.getOffsetAfter(mText, offset);
+        candidate = TextUtils.getOffsetAfter(mFriBidi.str, offset);
         if (candidate >= start && candidate <= end) {
             float h = getPrimaryHorizontal(candidate);
 
@@ -1023,43 +1003,34 @@ public abstract class Layout {
             }
         }
 
-        int here = start;
-        for (int i = 0; i < dirs.mDirections.length; i++) {
-            int there = here + dirs.mDirections[i];
-            if (there > end)
-                there = end;
+        float h = getPrimaryHorizontal(start);
 
-            float h = getPrimaryHorizontal(here);
-
-            if (h > horiz && h < besth) {
-                best = here;
-                besth = h;
-            }
-
-            candidate = TextUtils.getOffsetAfter(mText, here);
-            if (candidate >= start && candidate <= end) {
-                h = getPrimaryHorizontal(candidate);
-
-                if (h > horiz && h < besth) {
-                    best = candidate;
-                    besth = h;
-                }
-            }
-
-            candidate = TextUtils.getOffsetBefore(mText, there);
-            if (candidate >= start && candidate <= end) {
-                h = getPrimaryHorizontal(candidate);
-
-                if (h > horiz && h < besth) {
-                    best = candidate;
-                    besth = h;
-                }
-            }
-
-            here = there;
+        if (h > horiz && h < besth) {
+            best = start;
+            besth = h;
         }
 
-        float h = getPrimaryHorizontal(end);
+        candidate = TextUtils.getOffsetAfter(mFriBidi.str, start);
+        if (candidate >= start && candidate <= end) {
+            h = getPrimaryHorizontal(candidate);
+
+            if (h > horiz && h < besth) {
+                best = candidate;
+                besth = h;
+            }
+        }
+
+        candidate = TextUtils.getOffsetBefore(mOriginalText, end);
+        if (candidate >= start && candidate <= end) {
+            h = getPrimaryHorizontal(candidate);
+
+            if (h > horiz && h < besth) {
+                best = candidate;
+                besth = h;
+            }
+        }
+
+        h = getPrimaryHorizontal(end);
 
         if (h > horiz && h < besth) {
             best = end;
@@ -1069,26 +1040,17 @@ public abstract class Layout {
         if (best != offset)
             return best;
 
-        int dir = getParagraphDirection(line);
-
-        if (dir > 0) {
-            if (line == getLineCount() - 1)
-                return best;
-            else
-                return getOffsetForHorizontal(line + 1, -10000);
-        } else {
-            if (line == 0)
-                return best;
-            else
-                return getOffsetForHorizontal(line - 1, -10000);
-        }
+        if (line == getLineCount() - 1)
+            return best;
+        else
+            return getOffsetForHorizontal(line + 1, -10000);
     }
 
     private int getOffsetAtStartOf(int offset) {
         if (offset == 0)
             return 0;
 
-        CharSequence text = mText;
+        CharSequence text = mFriBidi.str;
         char c = text.charAt(offset);
 
         if (c >= '\uDC00' && c <= '\uDFFF') {
@@ -1099,12 +1061,12 @@ public abstract class Layout {
         }
 
         if (mSpannedText) {
-            ReplacementSpan[] spans = ((Spanned) text).getSpans(offset, offset,
+            ReplacementSpan[] spans = ((Spanned) mOriginalText).getSpans(offset, offset,
                                                        ReplacementSpan.class);
 
             for (int i = 0; i < spans.length; i++) {
-                int start = ((Spanned) text).getSpanStart(spans[i]);
-                int end = ((Spanned) text).getSpanEnd(spans[i]);
+                int start = ((Spanned) mOriginalText).getSpanStart(spans[i]);
+                int end = ((Spanned) mOriginalText).getSpanEnd(spans[i]);
 
                 if (start < offset && end > offset)
                     offset = start;
@@ -1201,30 +1163,20 @@ public abstract class Layout {
                               int top, int bottom, Path dest) {
         int linestart = getLineStart(line);
         int lineend = getLineEnd(line);
-        Directions dirs = getLineDirections(line);
 
-        if (lineend > linestart && mText.charAt(lineend - 1) == '\n')
+        if (lineend > linestart && mFriBidi.str.charAt(lineend - 1) == '\n')
             lineend--;
 
-        int here = linestart;
-        for (int i = 0; i < dirs.mDirections.length; i++) {
-            int there = here + dirs.mDirections[i];
-            if (there > lineend)
-                there = lineend;
+        if (start <= lineend && end >= linestart) {
+            int st = Math.max(start, linestart);
+            int en = Math.min(end, lineend);
 
-            if (start <= there && end >= here) {
-                int st = Math.max(start, here);
-                int en = Math.min(end, there);
+            if (st != en) {
+                float h1 = getHorizontal(st, false, false, line);
+                float h2 = getHorizontal(en, true, false, line);
 
-                if (st != en) {
-                    float h1 = getHorizontal(st, false, false, line);
-                    float h2 = getHorizontal(en, true, false, line);
-
-                    dest.addRect(h1, top, h2, bottom, Path.Direction.CW);
-                }
+                dest.addRect(h1, top, h2, bottom, Path.Direction.CW);
             }
-
-            here = there;
         }
     }
 
@@ -1260,12 +1212,8 @@ public abstract class Layout {
             addSelection(startline, start, getLineEnd(startline),
                          top, getLineBottom(startline), dest);
             
-            if (getParagraphDirection(startline) == DIR_RIGHT_TO_LEFT)
-                dest.addRect(getLineLeft(startline), top,
-                              0, getLineBottom(startline), Path.Direction.CW);
-            else
-                dest.addRect(getLineRight(startline), top,
-                              width, getLineBottom(startline), Path.Direction.CW);
+            dest.addRect(getLineRight(startline), top,
+                          width, getLineBottom(startline), Path.Direction.CW);
 
             for (int i = startline + 1; i < endline; i++) {
                 top = getLineTop(i);
@@ -1279,10 +1227,7 @@ public abstract class Layout {
             addSelection(endline, getLineStart(endline), end,
                          top, bottom, dest);
 
-            if (getParagraphDirection(endline) == DIR_RIGHT_TO_LEFT)
-                dest.addRect(width, top, getLineRight(endline), bottom, Path.Direction.CW);
-            else
-                dest.addRect(0, top, getLineLeft(endline), bottom, Path.Direction.CW);
+            dest.addRect(0, top, getLineLeft(endline), bottom, Path.Direction.CW);
         }
     }
 
@@ -1294,7 +1239,7 @@ public abstract class Layout {
         Alignment align = mAlignment;
 
         if (mSpannedText) {
-            Spanned sp = (Spanned) mText;
+            Spanned sp = (Spanned) mOriginalText;
             AlignmentSpan[] spans = sp.getSpans(getLineStart(line),
                                                 getLineEnd(line),
                                                 AlignmentSpan.class);
@@ -1312,31 +1257,27 @@ public abstract class Layout {
      * Get the left edge of the specified paragraph, inset by left margins.
      */
     public final int getParagraphLeft(int line) {
-        int dir = getParagraphDirection(line);
-
         int left = 0;
 
         boolean par = false;
         int off = getLineStart(line);
-        if (off == 0 || mText.charAt(off - 1) == '\n')
+        if (off == 0 || mFriBidi.str.charAt(off - 1) == '\n')
             par = true;
 
-        if (dir == DIR_LEFT_TO_RIGHT) {
-            if (mSpannedText) {
-                Spanned sp = (Spanned) mText;
-                LeadingMarginSpan[] spans = sp.getSpans(getLineStart(line),
-                                                        getLineEnd(line),
-                                                        LeadingMarginSpan.class);
+        if (mSpannedText) {
+            Spanned sp = (Spanned) mOriginalText;
+            LeadingMarginSpan[] spans = sp.getSpans(getLineStart(line),
+                                                    getLineEnd(line),
+                                                    LeadingMarginSpan.class);
 
-                for (int i = 0; i < spans.length; i++) {
-                    boolean margin = par;
-                    LeadingMarginSpan span = spans[i];
-                    if (span instanceof LeadingMarginSpan.LeadingMarginSpan2) {
-                        int count = ((LeadingMarginSpan.LeadingMarginSpan2)span).getLeadingMarginLineCount();
-                        margin = count >= line;
-                    }
-                    left += span.getLeadingMargin(margin);
+            for (int i = 0; i < spans.length; i++) {
+                boolean margin = par;
+                LeadingMarginSpan span = spans[i];
+                if (span instanceof LeadingMarginSpan.LeadingMarginSpan2) {
+                    int count = ((LeadingMarginSpan.LeadingMarginSpan2)span).getLeadingMarginLineCount();
+                    margin = count >= line;
                 }
+                left += span.getLeadingMargin(margin);
             }
         }
 
@@ -1347,49 +1288,21 @@ public abstract class Layout {
      * Get the right edge of the specified paragraph, inset by right margins.
      */
     public final int getParagraphRight(int line) {
-        int dir = getParagraphDirection(line);
-
         int right = mWidth;
-
-        boolean par = false;
-        int off = getLineStart(line);
-        if (off == 0 || mText.charAt(off - 1) == '\n')
-            par = true;
-
-
-        if (dir == DIR_RIGHT_TO_LEFT) {
-            if (mSpannedText) {
-                Spanned sp = (Spanned) mText;
-                LeadingMarginSpan[] spans = sp.getSpans(getLineStart(line),
-                                                        getLineEnd(line),
-                                                        LeadingMarginSpan.class);
-
-                for (int i = 0; i < spans.length; i++) {
-                    right -= spans[i].getLeadingMargin(par);
-                }
-            }
-        }
-
         return right;
     }
 
     private void drawText(Canvas canvas,
-                                 CharSequence text, int start, int end,
-                                 int dir, Directions directions,
+                                 CharSequence text, FriBidi fribidi,
+                                 int start, int end,
                                  float x, int top, int y, int bottom,
                                  TextPaint paint,
                                  TextPaint workPaint,
                                  boolean hasTabs, Object[] parspans) {
         char[] buf;
         if (!hasTabs) {
-            if (directions == DIRS_ALL_LEFT_TO_RIGHT) {
-                if (DEBUG) {
-                    Assert.assertTrue(DIR_LEFT_TO_RIGHT == dir);
-                }
-                Styled.drawText(canvas, text, start, end, dir, false, x, top, y, bottom, paint, workPaint, false);
-                return;
-            }
-            buf = null;
+            Styled.drawText(canvas, text, fribidi, start, end, x, top, y, bottom, paint, workPaint, false);
+            return;
         } else {
             buf = TextUtils.obtain(end - start);
             TextUtils.getChars(text, start, end, buf, 0);
@@ -1398,66 +1311,58 @@ public abstract class Layout {
         float h = 0;
 
         int here = 0;
-        for (int i = 0; i < directions.mDirections.length; i++) {
-            int there = here + directions.mDirections[i];
-            if (there > end - start)
-                there = end - start;
+        int there = end - start;
 
-            int segstart = here;
-            for (int j = hasTabs ? here : there; j <= there; j++) {
-                if (j == there || buf[j] == '\t') {
-                    h += Styled.drawText(canvas, text,
-                                         start + segstart, start + j,
-                                         dir, (i & 1) != 0, x + h,
-                                         top, y, bottom, paint, workPaint,
-                                         start + j != end);
+        int segstart = here;
+        for (int j = hasTabs ? here : there; j <= there; j++) {
+            if (j == there || buf[j] == '\t') {
+                h += Styled.drawText(canvas, text, fribidi,
+                                     start + segstart, start + j, x + h,
+                                     top, y, bottom, paint, workPaint,
+                                     start + j != end);
 
-                    if (j != there && buf[j] == '\t')
-                        h = dir * nextTab(text, start, end, h * dir, parspans);
+                if (j != there && buf[j] == '\t')
+                    h = nextTab(text, start, end, h, parspans);
 
-                    segstart = j + 1;
-                } else if (hasTabs && buf[j] >= 0xD800 && buf[j] <= 0xDFFF && j + 1 < there) {
-                    int emoji = Character.codePointAt(buf, j);
+                segstart = j + 1;
+            } else if (hasTabs && buf[j] >= 0xD800 && buf[j] <= 0xDFFF && j + 1 < there) {
+                int emoji = Character.codePointAt(buf, j);
 
-                    if (emoji >= MIN_EMOJI && emoji <= MAX_EMOJI) {
-                        Bitmap bm = EMOJI_FACTORY.
-                            getBitmapFromAndroidPua(emoji);
+                if (emoji >= MIN_EMOJI && emoji <= MAX_EMOJI) {
+                    Bitmap bm = EMOJI_FACTORY.
+                        getBitmapFromAndroidPua(emoji);
 
-                        if (bm != null) {
-                            h += Styled.drawText(canvas, text,
-                                                 start + segstart, start + j,
-                                                 dir, (i & 1) != 0, x + h,
-                                                 top, y, bottom, paint, workPaint,
-                                                 start + j != end);
+                    if (bm != null) {
+                        h += Styled.drawText(canvas, text, fribidi,
+                                             start + segstart, start + j, x + h,
+                                             top, y, bottom, paint, workPaint,
+                                             start + j != end);
 
-                            if (mEmojiRect == null) {
-                                mEmojiRect = new RectF();
-                            }
-
-                            workPaint.set(paint);
-                            Styled.measureText(paint, workPaint, text,
-                                               start + j, start + j + 1,
-                                               null);
-                                        
-                            float bitmapHeight = bm.getHeight();
-                            float textHeight = -workPaint.ascent();
-                            float scale = textHeight / bitmapHeight;
-                            float width = bm.getWidth() * scale;
-
-                            mEmojiRect.set(x + h, y - textHeight,
-                                           x + h + width, y);
-
-                            canvas.drawBitmap(bm, null, mEmojiRect, paint);
-                            h += width;
-
-                            j++;
-                            segstart = j + 1;
+                        if (mEmojiRect == null) {
+                            mEmojiRect = new RectF();
                         }
+
+                        workPaint.set(paint);
+                        Styled.measureText(paint, workPaint, text, fribidi,
+                                           start + j, start + j + 1,
+                                           null);
+                                    
+                        float bitmapHeight = bm.getHeight();
+                        float textHeight = -workPaint.ascent();
+                        float scale = textHeight / bitmapHeight;
+                        float width = bm.getWidth() * scale;
+
+                        mEmojiRect.set(x + h, y - textHeight,
+                                       x + h + width, y);
+
+                        canvas.drawBitmap(bm, null, mEmojiRect, paint);
+                        h += width;
+
+                        j++;
+                        segstart = j + 1;
                     }
                 }
             }
-
-            here = there;
         }
 
         if (hasTabs)
@@ -1467,8 +1372,8 @@ public abstract class Layout {
     private static float measureText(TextPaint paint,
                                      TextPaint workPaint,
                                      CharSequence text,
+                                     FriBidi fribidi,
                                      int start, int offset, int end,
-                                     int dir, Directions directions,
                                      boolean trailing, boolean alt,
                                      boolean hasTabs, Object[] tabs) {
         char[] buf = null;
@@ -1480,115 +1385,78 @@ public abstract class Layout {
 
         float h = 0;
 
-        if (alt) {
-            if (dir == DIR_RIGHT_TO_LEFT)
-                trailing = !trailing;
-        }
+        if (alt)
+            trailing = !trailing;
 
         int here = 0;
-        for (int i = 0; i < directions.mDirections.length; i++) {
-            if (alt)
-                trailing = !trailing;
+        int there = end - start;
 
-            int there = here + directions.mDirections[i];
-            if (there > end - start)
-                there = end - start;
+        int segstart = here;
+        for (int j = hasTabs ? here : there; j <= there; j++) {
+            int codept = 0;
+            Bitmap bm = null;
 
-            int segstart = here;
-            for (int j = hasTabs ? here : there; j <= there; j++) {
-                int codept = 0;
-                Bitmap bm = null;
+            if (hasTabs && j < there) {
+                codept = buf[j];
+            }
 
-                if (hasTabs && j < there) {
-                    codept = buf[j];
-                }
+            if (codept >= 0xD800 && codept <= 0xDFFF && j + 1 < there) {
+                codept = Character.codePointAt(buf, j);
 
-                if (codept >= 0xD800 && codept <= 0xDFFF && j + 1 < there) {
-                    codept = Character.codePointAt(buf, j);
-
-                    if (codept >= MIN_EMOJI && codept <= MAX_EMOJI) {
-                        bm = EMOJI_FACTORY.getBitmapFromAndroidPua(codept);
-                    }
-                }
-
-                if (j == there || codept == '\t' || bm != null) {
-                    float segw;
-
-                    if (offset < start + j ||
-                       (trailing && offset <= start + j)) {
-                        if (dir == DIR_LEFT_TO_RIGHT && (i & 1) == 0) {
-                            h += Styled.measureText(paint, workPaint, text,
-                                                    start + segstart, offset,
-                                                    null);
-                            return h;
-                        }
-
-                        if (dir == DIR_RIGHT_TO_LEFT && (i & 1) != 0) {
-                            h -= Styled.measureText(paint, workPaint, text,
-                                                    start + segstart, offset,
-                                                    null);
-                            return h;
-                        }
-                    }
-
-                    segw = Styled.measureText(paint, workPaint, text,
-                                              start + segstart, start + j,
-                                              null);
-
-                    if (offset < start + j ||
-                        (trailing && offset <= start + j)) {
-                        if (dir == DIR_LEFT_TO_RIGHT) {
-                            h += segw - Styled.measureText(paint, workPaint,
-                                                           text,
-                                                           start + segstart,
-                                                           offset, null);
-                            return h;
-                        }
-
-                        if (dir == DIR_RIGHT_TO_LEFT) {
-                            h -= segw - Styled.measureText(paint, workPaint,
-                                                           text,
-                                                           start + segstart,
-                                                           offset, null);
-                            return h;
-                        }
-                    }
-
-                    if (dir == DIR_RIGHT_TO_LEFT)
-                        h -= segw;
-                    else
-                        h += segw;
-
-                    if (j != there && buf[j] == '\t') {
-                        if (offset == start + j)
-                            return h;
-
-                        h = dir * nextTab(text, start, end, h * dir, tabs);
-                    }
-
-                    if (j != there && bm != null) {
-                        if (offset == start + j) return h;
-                        workPaint.set(paint);
-                        Styled.measureText(paint, workPaint, text,
-                                           j, j + 2, null);
-
-                        float wid = (float) bm.getWidth() *
-                                    -workPaint.ascent() / bm.getHeight();
-
-                        if (dir == DIR_RIGHT_TO_LEFT) {
-                            h -= wid;
-                        } else {
-                            h += wid;
-                        }
-
-                        j++;
-                    }
-
-                    segstart = j + 1;
+                if (codept >= MIN_EMOJI && codept <= MAX_EMOJI) {
+                    bm = EMOJI_FACTORY.getBitmapFromAndroidPua(codept);
                 }
             }
 
-            here = there;
+            if (j == there || codept == '\t' || bm != null) {
+                float segw;
+
+                if (offset < start + j ||
+                   (trailing && offset <= start + j)) {
+                    h += Styled.measureText(paint, workPaint, text, fribidi,
+                                            start + segstart, offset,
+                                            null);
+                    return h;
+                }
+
+                segw = Styled.measureText(paint, workPaint, text, fribidi,
+                                          start + segstart, start + j,
+                                          null);
+
+                if (offset < start + j ||
+                    (trailing && offset <= start + j)) {
+                    h += segw - Styled.measureText(paint, workPaint,
+                                                   text, fribidi,
+                                                   start + segstart,
+                                                   offset, null);
+                    return h;
+
+                }
+
+                h += segw;
+
+                if (j != there && buf[j] == '\t') {
+                    if (offset == start + j)
+                        return h;
+
+                    h = nextTab(text, start, end, h, tabs);
+                }
+
+                if (bm != null) {
+                    workPaint.set(paint);
+                    Styled.measureText(paint, workPaint, text, fribidi,
+                                       j, j + 2, null);
+
+                    float wid = (float) bm.getWidth() *
+                                -workPaint.ascent() / bm.getHeight();
+
+                    h += wid;
+
+                    j++;
+                }
+
+                segstart = j + 1;
+            }
         }
 
         if (hasTabs)
@@ -1615,6 +1483,7 @@ public abstract class Layout {
     /* package */ static float measureText(TextPaint paint,
                                            TextPaint workPaint,
                                            CharSequence text,
+                                           FriBidi fribidi,
                                            int start, int end,
                                            Paint.FontMetricsInt fm,
                                            boolean hasTabs, Object[] tabs) {
@@ -1655,7 +1524,12 @@ public abstract class Layout {
             if (pos == len || codept == '\t' || bm != null) {
                 workPaint.baselineShift = 0;
 
-                width += Styled.measureText(paint, workPaint, text,
+                int st = start + lastPos;
+                int en = start + pos;
+                if ((st > en) || (en > fribidi.before_reorder.length()))
+                    android.util.Log.w("FriBidi", "OOPS: st=" + st + ", en=" + en + ", len=" + len + ",start=" + start + ", end=" + end + ", text.length=" + fribidi.before_reorder.length() + ", text=" + FriBidi.unicodifyString(fribidi.before_reorder, true));
+
+                width += Styled.measureText(paint, workPaint, text, fribidi,
                                         start + lastPos, start + pos,
                                         fm);
 
@@ -1683,7 +1557,7 @@ public abstract class Layout {
                         // text is unstyled measureText might not use workPaint
                         // at all.
                         workPaint.set(paint);
-                        Styled.measureText(paint, workPaint, text,
+                        Styled.measureText(paint, workPaint, text, fribidi,
                                            start + pos, start + pos + 1, null);
 
                         width += (float) bm.getWidth() *
@@ -1776,6 +1650,14 @@ public abstract class Layout {
     protected final boolean isSpanned() {
         return mSpannedText;
     }
+    
+    public boolean isRTLText() {
+        return mRTLText;
+    }
+
+    public boolean isRTLUI() {
+        return mRTLUI;
+    }
 
     private void ellipsize(int start, int end, int line,
                            char[] dest, int destoff) {
@@ -1822,9 +1704,6 @@ public abstract class Layout {
             mDirections = dirs;
         }
 
-        boolean hasRTL() {
-            return mDirections.length>1 && mDirections[1]>0;
-        }
     }
 
     /**
@@ -1859,13 +1738,15 @@ public abstract class Layout {
         }
 
         public void getChars(int start, int end, char[] dest, int destoff) {
-            int line1 = mLayout.getLineForOffset(start);
-            int line2 = mLayout.getLineForOffset(end);
-
             TextUtils.getChars(mText, start, end, dest, destoff);
 
-            for (int i = line1; i <= line2; i++) {
-                mLayout.ellipsize(start, end, i, dest, destoff);
+            if (mLayout != null) {
+	            int line1 = mLayout.getLineForOffset(start);
+	            int line2 = mLayout.getLineForOffset(end);
+	
+	            for (int i = line1; i <= line2; i++) {
+	                mLayout.ellipsize(start, end, i, dest, destoff);
+	            }
             }
         }
 
@@ -1926,11 +1807,15 @@ public abstract class Layout {
         }
     }
 
-    private CharSequence mText;
+    protected CharSequence mOriginalText;
+    protected FriBidi mFriBidi;
+    protected boolean mRTLText;
+    protected boolean mRTLUI;
     private TextPaint mPaint;
     /* package */ TextPaint mWorkPaint;
     private int mWidth;
-    private Alignment mAlignment = Alignment.ALIGN_NORMAL;
+    protected Alignment mOriginalAlignment;
+    protected Alignment mAlignment = Alignment.ALIGN_NORMAL;
     private float mSpacingMult;
     private float mSpacingAdd;
     private static Rect sTempRect = new Rect();
@@ -1939,10 +1824,10 @@ public abstract class Layout {
     public static final int DIR_LEFT_TO_RIGHT = 1;
     public static final int DIR_RIGHT_TO_LEFT = -1;
     
-    /* package */ static final int DIR_REQUEST_LTR = 1;
-    /* package */ static final int DIR_REQUEST_RTL = -1;
-    /* package */ static final int DIR_REQUEST_DEFAULT_LTR = 2;
-    /* package */ static final int DIR_REQUEST_DEFAULT_RTL = -2;
+    /* package */ @Deprecated static final int DIR_REQUEST_LTR = 1;
+    /* package */ @Deprecated static final int DIR_REQUEST_RTL = -1;
+    /* package */ @Deprecated static final int DIR_REQUEST_DEFAULT_LTR = 2;
+    /* package */ @Deprecated static final int DIR_REQUEST_DEFAULT_RTL = -2;
 
     public enum Alignment {
         ALIGN_NORMAL,
@@ -1954,9 +1839,9 @@ public abstract class Layout {
 
     private static final int TAB_INCREMENT = 20;
 
-    /* package */ static final Directions DIRS_ALL_LEFT_TO_RIGHT =
+    /* package */ @Deprecated static final Directions DIRS_ALL_LEFT_TO_RIGHT =
                                        new Directions(new short[] { 32767 });
-    /* package */ static final Directions DIRS_ALL_RIGHT_TO_LEFT =
+    /* package */ @Deprecated static final Directions DIRS_ALL_RIGHT_TO_LEFT =
                                        new Directions(new short[] { 0, 32767 });
 
 }

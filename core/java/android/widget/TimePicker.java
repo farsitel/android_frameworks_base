@@ -131,7 +131,7 @@ public class TimePicker extends FrameLayout {
         mMinutePicker = (NumberPicker) findViewById(R.id.minute);
         mMinutePicker.setRange(0, 59);
         mMinutePicker.setSpeed(100);
-        mMinutePicker.setFormatter(NumberPicker.TWO_DIGIT_FORMATTER);
+        mMinutePicker.setFormatter(NumberPicker.getTwoDigitFormatter());
         mMinutePicker.setOnChangeListener(new NumberPicker.OnChangedListener() {
             public void onChanged(NumberPicker spinner, int oldVal, int newVal) {
                 mCurrentMinute = newVal;
@@ -339,7 +339,7 @@ public class TimePicker extends FrameLayout {
     private void configurePickerRanges() {
         if (mIs24HourView) {
             mHourPicker.setRange(0, 23);
-            mHourPicker.setFormatter(NumberPicker.TWO_DIGIT_FORMATTER);
+            mHourPicker.setFormatter(NumberPicker.getTwoDigitFormatter());
             mAmPmButton.setVisibility(View.GONE);
         } else {
             mHourPicker.setRange(1, 12);

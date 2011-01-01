@@ -77,7 +77,7 @@ extends Layout
          * cares about the content instead of just holding the reference.
          */
         if (ellipsize != null) {
-            Ellipsizer e = (Ellipsizer) getText();
+            Ellipsizer e = (Ellipsizer) mOriginalText;
 
             e.mLayout = this;
             e.mWidth = ellipsizedWidth;
@@ -91,10 +91,8 @@ extends Layout
         }
 
         mLines = new int[ArrayUtils.idealIntArraySize(2 * mColumns)];
-        mLineDirections = new Directions[
-                             ArrayUtils.idealIntArraySize(2 * mColumns)];
 
-        generate(source, bufstart, bufend, paint, outerwidth, align,
+        generate(source, mFriBidi, bufstart, bufend, paint, outerwidth, align,
                  spacingmult, spacingadd, includepad, includepad,
                  ellipsize != null, ellipsizedWidth, ellipsize);
 
@@ -109,17 +107,31 @@ extends Layout
 
         mColumns = COLUMNS_ELLIPSIZE;
         mLines = new int[ArrayUtils.idealIntArraySize(2 * mColumns)];
-        mLineDirections = new Directions[
-                             ArrayUtils.idealIntArraySize(2 * mColumns)];
     }
 
-    /* package */ void generate(CharSequence source, int bufstart, int bufend,
+    /* package */ void generate(CharSequence source, FriBidi fribidi, int bufstart, int bufend,
+            TextPaint paint, int outerwidth,
+            Alignment align,
+            float spacingmult, float spacingadd,
+            boolean includepad, boolean trackpad,
+            boolean breakOnlyAtSpaces,
+            float ellipsizedWidth, TextUtils.TruncateAt where) {
+        generate(source, fribidi, bufstart, bufend,
+                paint, outerwidth,
+                align,
+                spacingmult, spacingadd,
+                includepad, trackpad,
+                breakOnlyAtSpaces,
+                ellipsizedWidth, where, true);
+    }
+
+        /* package */ void generate(CharSequence source, FriBidi fribidi, int bufstart, int bufend,
                         TextPaint paint, int outerwidth,
                         Alignment align,
                         float spacingmult, float spacingadd,
                         boolean includepad, boolean trackpad,
                         boolean breakOnlyAtSpaces,
-                        float ellipsizedWidth, TextUtils.TruncateAt where) {
+                        float ellipsizedWidth, TextUtils.TruncateAt where, boolean doReorder) {
         mLineCount = 0;
 
         int v = 0;
@@ -128,7 +140,7 @@ extends Layout
         Paint.FontMetricsInt fm = mFontMetricsInt;
         int[] choosehtv = null;
 
-        int end = TextUtils.indexOf(source, '\n', bufstart, bufend);
+        int end = TextUtils.indexOf(fribidi.str, '\n', bufstart, bufend);
         int bufsiz = end >= 0 ? end - bufstart : bufend - bufstart;
         boolean first = true;
 
@@ -148,13 +160,11 @@ extends Layout
         if (source instanceof Spanned)
             spanned = (Spanned) source;
 
-        int DEFAULT_DIR = DIR_LEFT_TO_RIGHT; // XXX
-
         for (int start = bufstart; start <= bufend; start = end) {
             if (first)
                 first = false;
             else
-                end = TextUtils.indexOf(source, '\n', start, bufend);
+                end = TextUtils.indexOf(fribidi.str, '\n', start, bufend);
 
             if (end < 0)
                 end = bufend;
@@ -219,83 +229,10 @@ extends Layout
                 mWidths = widths;
             }
 
-            TextUtils.getChars(source, start, end, chs, 0);
+            TextUtils.getChars(fribidi.str, start, end, chs, 0);
             final int n = end - start;
 
-            boolean easy = true;
-            boolean altered = false;
-            int dir = DEFAULT_DIR; // XXX
-
-            for (int i = 0; i < n; i++) {
-                if (chs[i] >= FIRST_RIGHT_TO_LEFT) {
-                    easy = false;
-                    break;
-                }
-            }
-
-            if (!easy) {
-                // XXX put override flags, etc. into chdirs
-                dir = bidi(dir >= 0 ? DIR_REQUEST_DEFAULT_LTR : DIR_REQUEST_DEFAULT_RTL,
-                           chs, chdirs, n, false);
-            }
-
-            // Ensure that none of the underlying characters are treated
-            // as viable breakpoints, and that the entire run gets the
-            // same bidi direction.
-
-            final byte SOR = dir == DIR_LEFT_TO_RIGHT ?
-                Character.DIRECTIONALITY_LEFT_TO_RIGHT :
-                Character.DIRECTIONALITY_RIGHT_TO_LEFT;
-
-            if (source instanceof Spanned) {
-                Spanned sp = (Spanned) source;
-                ReplacementSpan[] spans = sp.getSpans(start, end, ReplacementSpan.class);
-
-                for (int y = 0; y < spans.length; y++) {
-                    int a = sp.getSpanStart(spans[y]);
-                    int b = sp.getSpanEnd(spans[y]);
-
-                    for (int x = a; x < b; x++) {
-                        chdirs[x - start] = SOR;
-                        chs[x - start] = '\uFFFC';
-                    }
-                }
-            }
-
-            if (!easy) {
-
-                // Do mirroring for right-to-left segments
-
-                for (int i = 0; i < n; i++) {
-                    if (chdirs[i] == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
-                        int j;
-
-                        for (j = i; j < n; j++) {
-                            if (chdirs[j] !=
-                                Character.DIRECTIONALITY_RIGHT_TO_LEFT)
-                                break;
-                        }
-
-                        if (AndroidCharacter.mirror(chs, i, j - i))
-                            altered = true;
-
-                        i = j - 1;
-                    }
-                }
-            }
-
-            CharSequence sub;
-
-            if (altered) {
-                if (alter == null)
-                    alter = AlteredCharSequence.make(source, chs, start, end);
-                else
-                    alter.update(chs, start, end);
-
-                sub = alter;
-            } else {
-                sub = source;
-            }
+            String sub = fribidi.str;
 
             int width = firstwidth;
 
@@ -322,7 +259,7 @@ extends Layout
                                                       class);
 
                 if (spanned == null) {
-                    final int actualNum = paint.getTextWidths(sub, i, next, widths);
+                    final int actualNum = paint._getTextWidths(sub, i, next, widths);
                     if (next - i > actualNum)
                         adjustTextWidths(widths, sub, i, next, actualNum);
                     System.arraycopy(widths, 0, widths,
@@ -332,11 +269,10 @@ extends Layout
                 } else {
                     mWorkPaint.baselineShift = 0;
 
-                    final int actualNum = Styled.getTextWidths(paint, mWorkPaint,
-                            spanned, i, next,
-                            widths, fm);
-                    if (next - i > actualNum)
-                        adjustTextWidths(widths, spanned, i, next, actualNum);
+                    Styled.getTextWidths(paint, mWorkPaint,
+                                         spanned, fribidi,
+                                         i, next,
+                                         widths, fm);
                     System.arraycopy(widths, 0, widths,
                                      end - start + (i - start), next - i);
 
@@ -465,13 +401,13 @@ extends Layout
                                 ok++;
                             }
 
-                            v = out(source,
+                            v = out(fribidi.str,
                                     here, ok,
                                     okascent, okdescent, oktop, okbottom,
                                     v,
                                     spacingmult, spacingadd, chooseht,
                                     choosehtv, fm, tab,
-                                    needMultiply, start, chdirs, dir, easy,
+                                    needMultiply, start, chdirs,
                                     ok == bufend, includepad, trackpad,
                                     widths, start, end - start,
                                     where, ellipsizedWidth, okwidth,
@@ -501,13 +437,13 @@ extends Layout
                                 ok++;
                             }
 
-                            v = out(source,
+                            v = out(fribidi.str,
                                     here, ok,
                                     okascent, okdescent, oktop, okbottom,
                                     v,
                                     spacingmult, spacingadd, chooseht,
                                     choosehtv, fm, tab,
-                                    needMultiply, start, chdirs, dir, easy,
+                                    needMultiply, start, chdirs,
                                     ok == bufend, includepad, trackpad,
                                     widths, start, end - start,
                                     where, ellipsizedWidth, okwidth,
@@ -516,14 +452,14 @@ extends Layout
                             here = ok;
                         } else if (fit != here) {
                             // Log.e("text", "output fit " + here + " to " +fit);
-                            v = out(source,
+                            v = out(fribidi.str,
                                     here, fit,
                                     fitascent, fitdescent,
                                     fittop, fitbottom,
                                     v,
                                     spacingmult, spacingadd, chooseht,
                                     choosehtv, fm, tab,
-                                    needMultiply, start, chdirs, dir, easy,
+                                    needMultiply, start, chdirs,
                                     fit == bufend, includepad, trackpad,
                                     widths, start, end - start,
                                     where, ellipsizedWidth, fitwidth,
@@ -533,17 +469,17 @@ extends Layout
                         } else {
                             // Log.e("text", "output one " + here + " to " +(here + 1));
                             measureText(paint, mWorkPaint,
-                                        source, here, here + 1, fm, tab,
+                                        source, fribidi, here, here + 1, fm, tab,
                                         null);
 
-                            v = out(source,
+                            v = out(fribidi.str,
                                     here, here+1,
                                     fm.ascent, fm.descent,
                                     fm.top, fm.bottom,
                                     v,
                                     spacingmult, spacingadd, chooseht,
                                     choosehtv, fm, tab,
-                                    needMultiply, start, chdirs, dir, easy,
+                                    needMultiply, start, chdirs,
                                     here + 1 == bufend, includepad,
                                     trackpad,
                                     widths, start, end - start,
@@ -583,13 +519,13 @@ extends Layout
 
                 // Log.e("text", "output rest " + here + " to " + end);
 
-                v = out(source,
+                v = out(fribidi.str,
                         here, end, fitascent, fitdescent,
                         fittop, fitbottom,
                         v,
                         spacingmult, spacingadd, chooseht,
                         choosehtv, fm, tab,
-                        needMultiply, start, chdirs, dir, easy,
+                        needMultiply, start, chdirs,
                         end == bufend, includepad, trackpad,
                         widths, start, end - start,
                         where, ellipsizedWidth, w, paint);
@@ -600,22 +536,28 @@ extends Layout
             if (end == bufend)
                 break;
         }
-
-        if (bufend == bufstart || source.charAt(bufend - 1) == '\n') {
+        
+        if (bufend == bufstart || fribidi.str.charAt(bufend - 1) == '\n') {
             // Log.e("text", "output last " + bufend);
 
             paint.getFontMetricsInt(fm);
 
-            v = out(source,
+            v = out(fribidi.str,
                     bufend, bufend, fm.ascent, fm.descent,
                     fm.top, fm.bottom,
                     v,
                     spacingmult, spacingadd, null,
                     null, fm, false,
-                    needMultiply, bufend, chdirs, DEFAULT_DIR, true,
+                    needMultiply, bufend, chdirs,
                     true, includepad, trackpad,
                     widths, bufstart, 0,
                     where, ellipsizedWidth, 0, paint);
+        }
+
+        if (doReorder) {
+            for (int i = 0; i < mLineCount; i++) {
+                fribidi.reorder(getLineStart(i), getLineStart(i + 1) - getLineStart(i));
+            }
         }
     }
 
@@ -638,256 +580,9 @@ extends Layout
      * @return the resolved direction level of the first paragraph, either
      * DIR_LEFT_TO_RIGHT or DIR_RIGHT_TO_LEFT.
      */
-    /* package */ static int bidi(int dir, char[] chs, byte[] chInfo, int n, 
+    /* package */ @Deprecated static int bidi(int dir, char[] chs, byte[] chInfo, int n, 
             boolean hasInfo) {
-        
-        AndroidCharacter.getDirectionalities(chs, chInfo, n);
-
-        /*
-         * Determine primary paragraph direction if not specified
-         */
-        if (dir != DIR_REQUEST_LTR && dir != DIR_REQUEST_RTL) {
-            // Heuristic - LTR unless paragraph contains any RTL chars
-            dir = DIR_LEFT_TO_RIGHT;
-            for (int j = 0; j < n; j++) {
-                if (chInfo[j] == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
-                    dir = DIR_RIGHT_TO_LEFT;
-                    break;
-                }
-            }
-        }
-
-        /*
-         * XXX Explicit overrides should go here
-         */
-
-        /*
-         * Weak type resolution
-         */
-
-        final byte SOR = dir == DIR_LEFT_TO_RIGHT ?
-                Character.DIRECTIONALITY_LEFT_TO_RIGHT :
-                Character.DIRECTIONALITY_RIGHT_TO_LEFT;
-
-        // dump(chInfo, n, "initial");
-
-        // W1 non spacing marks
-        for (int j = 0; j < n; j++) {
-            if (chInfo[j] == Character.NON_SPACING_MARK) {
-                if (j == 0)
-                    chInfo[j] = SOR;
-                else
-                    chInfo[j] = chInfo[j - 1];
-            }
-        }
-
-        // dump(chInfo, n, "W1");
-
-        // W2 european numbers
-        byte cur = SOR;
-        for (int j = 0; j < n; j++) {
-            byte d = chInfo[j];
-
-            if (d == Character.DIRECTIONALITY_LEFT_TO_RIGHT ||
-                d == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
-                d == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC)
-                cur = d;
-            else if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER) {
-                 if (cur ==
-                    Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC)
-                    chInfo[j] = Character.DIRECTIONALITY_ARABIC_NUMBER;
-            }
-        }
-
-        // dump(chInfo, n, "W2");
-
-        // W3 arabic letters
-        for (int j = 0; j < n; j++) {
-            if (chInfo[j] == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC)
-                chInfo[j] = Character.DIRECTIONALITY_RIGHT_TO_LEFT;
-        }
-
-        // dump(chInfo, n, "W3");
-
-        // W4 single separator between numbers
-        for (int j = 1; j < n - 1; j++) {
-            byte d = chInfo[j];
-            byte prev = chInfo[j - 1];
-            byte next = chInfo[j + 1];
-
-            boolean isSpace = Character.isWhitespace(chs[j]);
-            boolean nextIsSpace = Character.isWhitespace(chs[j + 1]);
-
-            if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER_SEPARATOR) {
-                if (prev == Character.DIRECTIONALITY_EUROPEAN_NUMBER &&
-                    next == Character.DIRECTIONALITY_EUROPEAN_NUMBER)
-                    chInfo[j] = Character.DIRECTIONALITY_EUROPEAN_NUMBER;
-            } else if (d == Character.DIRECTIONALITY_COMMON_NUMBER_SEPARATOR) {
-                if (prev == Character.DIRECTIONALITY_EUROPEAN_NUMBER &&
-                    next == Character.DIRECTIONALITY_EUROPEAN_NUMBER)
-                    chInfo[j] = Character.DIRECTIONALITY_EUROPEAN_NUMBER;
-                if (prev == Character.DIRECTIONALITY_ARABIC_NUMBER &&
-                    next == Character.DIRECTIONALITY_ARABIC_NUMBER)
-                    chInfo[j] = Character.DIRECTIONALITY_ARABIC_NUMBER;
-                // add condition for spaces following the separator
-                if (nextIsSpace &&
-                            (   prev == Character.DIRECTIONALITY_EUROPEAN_NUMBER
-                             || prev == Character.DIRECTIONALITY_ARABIC_NUMBER  ) )
-                            chInfo[j] = SOR;
-            }
-            // add condition if the separator is a space
-            else if (isSpace && prev != SOR &&
-                            (   next == Character.DIRECTIONALITY_EUROPEAN_NUMBER
-                             || next == Character.DIRECTIONALITY_ARABIC_NUMBER  ) ) {
-                chInfo[j] = SOR;
-                for (int k=j+1; k < n; ++k) {
-                    if (chInfo[k] == Character.DIRECTIONALITY_LEFT_TO_RIGHT) {
-                        chInfo[j] = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
-                        break;
-                    }
-                    if (chInfo[k] == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
-                        chInfo[j] = Character.DIRECTIONALITY_RIGHT_TO_LEFT;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // dump(chInfo, n, "W4");
-
-        // W5 european number terminators
-        boolean adjacent = false;
-        for (int j = 0; j < n; j++) {
-            byte d = chInfo[j];
-
-            if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER)
-                adjacent = true;
-            else if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER_TERMINATOR && adjacent)
-                chInfo[j] = Character.DIRECTIONALITY_EUROPEAN_NUMBER;
-            else
-                adjacent = false;
-        }
-
-        //dump(chInfo, n, "W5");
-
-        // W5 european number terminators part 2,
-        // W6 separators and terminators
-        adjacent = false;
-        for (int j = n - 1; j >= 0; j--) {
-            byte d = chInfo[j];
-
-            if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER)
-                adjacent = true;
-            else if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER_TERMINATOR) {
-                if (adjacent)
-                    chInfo[j] = Character.DIRECTIONALITY_EUROPEAN_NUMBER;
-                else
-                    chInfo[j] = Character.DIRECTIONALITY_OTHER_NEUTRALS;
-            }
-            else {
-                adjacent = false;
-
-                if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER_SEPARATOR ||
-                    d == Character.DIRECTIONALITY_COMMON_NUMBER_SEPARATOR ||
-                    d == Character.DIRECTIONALITY_PARAGRAPH_SEPARATOR ||
-                    d == Character.DIRECTIONALITY_SEGMENT_SEPARATOR)
-                    chInfo[j] = Character.DIRECTIONALITY_OTHER_NEUTRALS;
-            }
-        }
-
-        // dump(chInfo, n, "W6");
-
-        // W7 strong direction of european numbers
-        cur = SOR;
-        for (int j = 0; j < n; j++) {
-            byte d = chInfo[j];
-
-            if (d == SOR ||
-                d == Character.DIRECTIONALITY_LEFT_TO_RIGHT ||
-                d == Character.DIRECTIONALITY_RIGHT_TO_LEFT)
-                cur = d;
-
-            if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER)
-                chInfo[j] = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
-        }
-
-        // dump(chInfo, n, "W7");
-
-        // N1, N2 neutrals
-        cur = SOR;
-        for (int j = 0; j < n; j++) {
-            byte d = chInfo[j];
-
-            if (d == Character.DIRECTIONALITY_LEFT_TO_RIGHT ||
-                d == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
-                cur = d;
-            } else if (d == Character.DIRECTIONALITY_EUROPEAN_NUMBER ||
-                       d == Character.DIRECTIONALITY_ARABIC_NUMBER) {
-                cur = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
-            } else {
-                byte dd = SOR;
-                int k;
-
-                for (k = j + 1; k < n; k++) {
-                    dd = chInfo[k];
-
-                    if (dd == Character.DIRECTIONALITY_LEFT_TO_RIGHT ||
-                        dd == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
-                        break;
-                    }
-                    if (dd == Character.DIRECTIONALITY_EUROPEAN_NUMBER ||
-                        dd == Character.DIRECTIONALITY_ARABIC_NUMBER) {
-                        dd = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
-                        break;
-                    }
-                }
-
-                for (int y = j; y < k; y++) {
-                    if (dd == cur)
-                        chInfo[y] = cur;
-                    else
-                        chInfo[y] = SOR;
-                }
-
-                j = k - 1;
-            }
-        }
-
-        // dump(chInfo, n, "final");
-
-        // extra: enforce that all tabs and surrogate characters go the
-        // primary direction
-        // TODO: actually do directions right for surrogates
-
-        for (int j = 0; j < n; j++) {
-            char c = chs[j];
-
-            if (c == '\t' || (c >= 0xD800 && c <= 0xDFFF)) {
-                chInfo[j] = SOR;
-            }
-        }
-        
-        // Deal specifically with special operators (like '+',etc.) ahead of numbers/english inside RTL paragraphs
-        for (int j = 0; j < n; j++) {
-            switch(chs[j]) {
-            case '+':
-            // For the following chars it is logical to apply the fix, but it appears
-            // it customary only for the "+" and we need to behave similarly to other devices:
-            //case '*':
-            //case '/':
-            //case '@':
-            //case '#':
-            //case '$':
-            //case '%':
-            //case '^':
-            //case '&':
-            //case '_':
-            //case '\\':
-                chInfo[j] = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
-            }
-        }
-
-        return dir;
+        return 0;
     }
 
     private static final char FIRST_CJK = '\u2E80';
@@ -995,28 +690,6 @@ extends Layout
     }
 */
 
-    private static int getFit(TextPaint paint,
-                              TextPaint workPaint,
-                       CharSequence text, int start, int end,
-                       float wid) {
-        int high = end + 1, low = start - 1, guess;
-
-        while (high - low > 1) {
-            guess = (high + low) / 2;
-
-            if (measureText(paint, workPaint,
-                            text, start, guess, null, true, null) > wid)
-                high = guess;
-            else
-                low = guess;
-        }
-
-        if (low < start)
-            return start;
-        else
-            return low;
-    }
-
     private static void adjustTextWidths(float[] widths, CharSequence text,
                               int curPos, int nextPos, int actualNum) {
         try {
@@ -1029,7 +702,7 @@ extends Layout
                 widths[dstIndex--] = widths[srcIndex];
             }
         } catch (IndexOutOfBoundsException e) {
-            Log.e("text", "adjust text widths failed");
+            //Log.e("text", "adjust text widths failed");
         }
     }
 
@@ -1039,7 +712,7 @@ extends Layout
                       LineHeightSpan[] chooseht, int[] choosehtv,
                       Paint.FontMetricsInt fm, boolean tab,
                       boolean needMultiply, int pstart, byte[] chdirs,
-                      int dir, boolean easy, boolean last,
+                      boolean last,
                       boolean includepad, boolean trackpad,
                       float[] widths, int widstart, int widoff,
                       TextUtils.TruncateAt ellipsize, float ellipsiswidth,
@@ -1057,11 +730,6 @@ extends Layout
             System.arraycopy(lines, 0, grow, 0, lines.length);
             mLines = grow;
             lines = grow;
-
-            Directions[] grow2 = new Directions[nlen];
-            System.arraycopy(mLineDirections, 0, grow2, 0,
-                             mLineDirections.length);
-            mLineDirections = grow2;
         }
 
         if (chooseht != null) {
@@ -1130,51 +798,7 @@ extends Layout
             lines[off + TAB] |= TAB_MASK;
 
         {
-            lines[off + DIR] |= dir << DIR_SHIFT;
-
-            int cur = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
-            int count = 0;
-
-            if (!easy) {
-                for (int k = start; k < end; k++) {
-                    if (chdirs[k - pstart] != cur) {
-                        count++;
-                        cur = chdirs[k - pstart];
-                    }
-                }
-            }
-
-            Directions linedirs;
-
-            if (count == 0) {
-                linedirs = DIRS_ALL_LEFT_TO_RIGHT;
-            } else {
-                short[] ld = new short[count + 1];
-
-                cur = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
-                count = 0;
-                int here = start;
-
-                for (int k = start; k < end; k++) {
-                    if (chdirs[k - pstart] != cur) {
-                        // XXX check to make sure we don't
-                        //     overflow short
-                        ld[count++] = (short) (k - here);
-                        cur = chdirs[k - pstart];
-                        here = k;
-                    }
-                }
-
-                ld[count] = (short) (end - here);
-
-                if (count == 1 && ld[0] == 0) {
-                    linedirs = DIRS_ALL_RIGHT_TO_LEFT;
-                } else {
-                    linedirs = new Directions(ld);
-                }
-            }
-
-            mLineDirections[j] = linedirs;
+        	lines[off + START] |= 1 << 30;
 
             // If ellipsize is in marquee mode, do not apply ellipsis on the first line
             if (ellipsize != null && (ellipsize != TextUtils.TruncateAt.MARQUEE || j != 0)) {
@@ -1310,17 +934,8 @@ extends Layout
         return mLines[mColumns * line + START] & START_MASK;
     }
 
-    public int getParagraphDirection(int line) {
-        // LTR unless paragraph contains RTL chars (anywhere)
-        return mLineDirections[line].hasRTL() ? DIR_RIGHT_TO_LEFT : DIR_LEFT_TO_RIGHT;
-    }
-
     public boolean getLineContainsTab(int line) {
         return (mLines[mColumns * line + TAB] & TAB_MASK) != 0;
-    }
-
-    public final Directions getLineDirections(int line) {
-        return mLineDirections[line];
     }
 
     public int getTopPadding() {
@@ -1362,7 +977,6 @@ extends Layout
     private static final int COLUMNS_NORMAL = 3;
     private static final int COLUMNS_ELLIPSIZE = 5;
     private static final int START = 0;
-    private static final int DIR = START;
     private static final int TAB = START;
     private static final int TOP = 1;
     private static final int DESCENT = 2;
@@ -1370,14 +984,9 @@ extends Layout
     private static final int ELLIPSIS_COUNT = 4;
 
     private int[] mLines;
-    private Directions[] mLineDirections;
 
     private static final int START_MASK = 0x1FFFFFFF;
-    private static final int DIR_MASK   = 0xC0000000;
-    private static final int DIR_SHIFT  = 30;
     private static final int TAB_MASK   = 0x20000000;
-
-    private static final char FIRST_RIGHT_TO_LEFT = '\u0590';
 
     /*
      * These are reused across calls to generate()

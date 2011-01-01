@@ -291,4 +291,12 @@ public interface InputType {
      * only a time.
      */
     public static final int TYPE_DATETIME_VARIATION_TIME = 0x00000020;
+
+
+    /**
+     * Digits in the text will be replaced by corresponding digits used
+     * in the current local (Persian for example) if this flag is on. 
+     */
+    public static final int TYPE_TEXT_FLAG_LOCALIZED_DIGITS = 0x00100000;
+
 }

@@ -16,6 +16,13 @@
 
 package android.text.format;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.Locale;
+import java.util.TimeZone;
+
 import android.content.Context;
 import android.provider.Settings;
 import android.text.SpannableStringBuilder;
@@ -23,13 +30,6 @@ import android.text.Spanned;
 import android.text.SpannedString;
 
 import com.android.internal.R;
-
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.Locale;
-import java.util.TimeZone;
-import java.text.SimpleDateFormat;
 
 /**
     Utility class for producing strings with formatted date/time.
@@ -129,6 +129,8 @@ public class DateFormat {
         hh -> 03
      */
     public  static final char    HOUR                   =    'h';
+// "HH:mm" is how java.text.format works.
+    public  static final char    HOUR_CAPITAL           =    'H';
 
     /**
         This designator indicates the hour of the day in 24 hour format.
@@ -188,7 +190,6 @@ public class DateFormat {
         yyyy -> 2006
      */
     public  static final char    YEAR                   =    'y';
-
 
     private static final Object sLocaleLock = new Object();
     private static Locale sIs24HourLocale;
@@ -259,6 +260,19 @@ public class DateFormat {
         return new java.text.SimpleDateFormat(context.getString(res));
     }
 
+    public static final String getTimeFormatString(Context context) {
+        boolean b24 = is24HourFormat(context);
+        int res;
+
+        if (b24) {
+            res = R.string.twenty_four_hour_time_format;
+        } else {
+            res = R.string.twelve_hour_time_format;
+        }
+
+        return context.getString(res);
+    }
+
     /**
      * Returns a {@link java.text.DateFormat} object that can format the date 
      * in short form (such as 12/31/1999) according
@@ -289,7 +303,7 @@ public class DateFormat {
         return new java.text.SimpleDateFormat(format);
     }
 
-    private static String getDateFormatStringForSetting(Context context, String value) {
+    public static String getDateFormatStringForSetting(Context context, String value) {
         if (value != null) {
             int month = value.indexOf('M');
             int day = value.indexOf('d');
@@ -389,7 +403,7 @@ public class DateFormat {
         return order;
     }
     
-    private static String getDateFormatString(Context context) {
+    public static String getDateFormatString(Context context) {
         String value = Settings.System.getString(context.getContentResolver(),
                 Settings.System.DATE_FORMAT);
 
@@ -407,6 +421,14 @@ public class DateFormat {
         return format(inFormat, new Date(inTimeInMillis));
     }
 
+    public static final CharSequence format(CharSequence inFormat, long inTimeInMillis, Context context) {
+        return format(inFormat, new Date(inTimeInMillis), Jalali.isJalali(context));
+    }
+
+    public static final CharSequence format(CharSequence inFormat, long inTimeInMillis, boolean isJalali) {
+        return format(inFormat, new Date(inTimeInMillis), isJalali);
+    }
+
     /**
      * Given a format string and a {@link java.util.Date} object, returns a CharSequence containing
      * the requested date.
@@ -422,6 +444,22 @@ public class DateFormat {
         return format(inFormat, c);
     }
 
+    public static final CharSequence format(CharSequence inFormat, Date inDate, Context context) {
+        Calendar    c = new GregorianCalendar();
+        
+        c.setTime(inDate);
+        
+        return format(inFormat, c, Jalali.isJalali(context));
+    }
+
+    public static final CharSequence format(CharSequence inFormat, Date inDate, boolean isJalali) {
+        Calendar    c = new GregorianCalendar();
+        
+        c.setTime(inDate);
+        
+        return format(inFormat, c, isJalali);
+    }
+
     /**
      * Given a format string and a {@link java.util.Calendar} object, returns a CharSequence 
      * containing the requested date.
@@ -430,9 +468,19 @@ public class DateFormat {
      * @return a {@link CharSequence} containing the requested text
      */
     public static final CharSequence format(CharSequence inFormat, Calendar inDate) {
+    	return format(inFormat, inDate, false);
+    }
+
+    public static final CharSequence format(CharSequence inFormat, Calendar inDate, Context context) {
+    	return format(inFormat, inDate, Jalali.isJalali(context));
+    }
+
+    public static final CharSequence format(CharSequence inFormat, Calendar inDate, boolean isJalali) {
         SpannableStringBuilder      s = new SpannableStringBuilder(inFormat);
         int             c;
         int             count;
+
+        JalaliDate jDate = isJalali ? Jalali.gregorianToJalali(inDate.getTime()) : null;
 
         int len = inFormat.length();
 
@@ -465,7 +513,11 @@ public class DateFormat {
                     break;
                 
                 case DATE:
-                    replacement = zeroPad(inDate.get(Calendar.DATE), count);
+                	if (isJalali) {
+                		replacement = zeroPad(jDate.day, count);
+                	} else {
+                		replacement = zeroPad(inDate.get(Calendar.DATE), count);
+                	}
                     break;
                     
                 case DAY:
@@ -477,6 +529,7 @@ public class DateFormat {
                     break;
                     
                 case HOUR:
+                case HOUR_CAPITAL:
                     temp = inDate.get(Calendar.HOUR);
 
                     if (0 == temp)
@@ -494,7 +547,11 @@ public class DateFormat {
                     break;
                     
                 case MONTH:
-                    replacement = getMonthString(inDate, count);
+                	if (isJalali) {
+                		replacement = getMonthString(jDate, count);
+                	} else {
+                		replacement = getMonthString(inDate, count);
+                	}
                     break;
                     
                 case SECONDS:
@@ -506,7 +563,11 @@ public class DateFormat {
                     break;
                     
                 case YEAR:
-                    replacement = getYearString(inDate, count);
+                	if (isJalali) {
+                		replacement = getYearString(jDate, count);
+                	} else {
+                		replacement = getYearString(inDate, count);
+                	}
                     break;
 
                 default:
@@ -538,6 +599,14 @@ public class DateFormat {
             // Calendar.JANUARY == 0, so add 1 to month.
             return zeroPad(month+1, count);
         }
+    }
+        
+    private static final String getMonthString(JalaliDate jDate, int count) {
+    	if (count >= 3) {
+    		return Jalali.getLongMonthName(jDate.month);
+    	} else {
+    		return zeroPad(jDate.month, count);
+    	}
     }
         
     private static final String getTimeZoneString(Calendar inDate, int count) {
@@ -574,7 +643,11 @@ public class DateFormat {
     
     private static final String getYearString(Calendar inDate, int count) {
         int year = inDate.get(Calendar.YEAR);
-        return (count <= 2) ? zeroPad(year % 100, 2) : String.valueOf(year);
+        return (count <= 2) ? zeroPad(year % 100, 2) : String.format("%Ld", year);
+    }
+   
+    private static final String getYearString(JalaliDate inDate, int count) {
+       	return (count <= 2) ? zeroPad(inDate.year % 100, 2) : String.format("%Ld", inDate.year);
     }
    
     private static final int appendQuotedText(SpannableStringBuilder s, int i, int len) {
@@ -626,6 +699,7 @@ public class DateFormat {
             val.getChars(0, val.length(), buf, inMinDigits - val.length());
             val = new String(buf);
         }
-        return val;
+
+        return String.format("%Ls", val);
     }
 }

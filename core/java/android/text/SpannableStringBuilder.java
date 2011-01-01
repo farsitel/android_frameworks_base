@@ -867,7 +867,7 @@ implements CharSequence, GetChars, Spannable, Editable, Appendable,
         char[] buf = new char[len];
 
         getChars(0, len, buf, 0);
-        return new String(buf);
+        return new String(buf, 0 , len);
     }
 
     private TextWatcher[] sendTextWillChange(int start, int before, int after) {
@@ -968,29 +968,30 @@ implements CharSequence, GetChars, Spannable, Editable, Appendable,
         return flag & 0x0F;
     }
 
-    public void dump() { // XXX
+    public String dump() { // XXX
+    	StringBuffer sb = new StringBuffer();
         for (int i = 0; i < mGapStart; i++) {
-            System.out.print('|');
-            System.out.print(' ');
-            System.out.print(isprint(mText[i]) ? mText[i] : '.');
-            System.out.print(' ');
+            sb.append('|');
+            sb.append(' ');
+            sb.append(isprint(mText[i]) ? mText[i] : '.');
+            sb.append(' ');
         }
 
         for (int i = mGapStart; i < mGapStart + mGapLength; i++) {
-            System.out.print('|');
-            System.out.print('(');
-            System.out.print(isprint(mText[i]) ? mText[i] : '.');
-            System.out.print(')');
+            sb.append('|');
+            sb.append('(');
+            sb.append(isprint(mText[i]) ? mText[i] : '.');
+            sb.append(')');
         }
 
         for (int i = mGapStart + mGapLength; i < mText.length; i++) {
-            System.out.print('|');
-            System.out.print(' ');
-            System.out.print(isprint(mText[i]) ? mText[i] : '.');
-            System.out.print(' ');
+            sb.append('|');
+            sb.append(' ');
+            sb.append(isprint(mText[i]) ? mText[i] : '.');
+            sb.append(' ');
         }
 
-        System.out.print('\n');
+        sb.append('\n');
 
         for (int i = 0; i < mText.length + 1; i++) {
             int found = 0;
@@ -1012,24 +1013,25 @@ implements CharSequence, GetChars, Spannable, Editable, Appendable,
 
             if (found == 1) {
                 if (startFlag(mSpanFlags[wfound]) == MARK)
-                    System.out.print("(   ");
+                    sb.append("(   ");
                 if (startFlag(mSpanFlags[wfound]) == PARAGRAPH)
-                    System.out.print("<   ");
+                    sb.append("<   ");
                 else
-                    System.out.print("[   ");
+                    sb.append("[   ");
             } else if (found == 2) {
                 if (endFlag(mSpanFlags[wfound]) == POINT)
-                    System.out.print(")   ");
+                    sb.append(")   ");
                 if (endFlag(mSpanFlags[wfound]) == PARAGRAPH)
-                    System.out.print(">   ");
+                    sb.append(">   ");
                 else
-                    System.out.print("]   ");
+                    sb.append("]   ");
             } else {
-                System.out.print("    ");
+                sb.append("    ");
             }
         }
 
-        System.out.print("\n");
+        sb.append("\n");
+        return sb.toString();
     }
 */
 
@@ -1042,14 +1044,14 @@ implements CharSequence, GetChars, Spannable, Editable, Appendable,
         checkRange("drawText", start, end);
 
         if (end <= mGapStart) {
-            c.drawText(mText, start, end - start, x, y, p,true);
+            c.drawText(mText, start, end - start, x, y, p);
         } else if (start >= mGapStart) {
-            c.drawText(mText, start + mGapLength, end - start, x, y, p,true);
+            c.drawText(mText, start + mGapLength, end - start, x, y, p);
         } else {
             char[] buf = TextUtils.obtain(end - start);
 
             getChars(start, end, buf, 0);
-            c.drawText(buf, 0, end - start, x, y, p,true);
+            c.drawText(buf, 0, end - start, x, y, p);
             TextUtils.recycle(buf);
         }
     }

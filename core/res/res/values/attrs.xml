@@ -632,6 +632,8 @@
              {@link android.text.InputType#TYPE_CLASS_DATETIME} |
              {@link android.text.InputType#TYPE_DATETIME_VARIATION_TIME}. -->
         <flag name="time" value="0x00000024" />
+        <!-- Converts the latin digits to local digits -->
+        <flag name="localizedDigits" value="0x00100000" />
     </attr>
 
     <!-- Additional features you can enable in an IME associated with an editor
@@ -816,6 +818,11 @@
         <enum name="vertical" value="1" />
         <!-- no orientation (lockscreen hack only for gestures.) -->
         <enum name="none" value="2" />
+        <!-- Extra orientation values to force BiDi directions to the widget. The defualt one gets direction from locale. -->
+        <!-- Defines an horizontal widget, forcing LTR layout. -->
+        <enum name="horizontal_ltr" value="3" />
+        <!-- Defines an horizontal widget, forcing RTL layout. -->
+        <enum name="horizontal_rtl" value="4" />
     </attr>
 
     <!-- ========================== -->

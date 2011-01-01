@@ -136,7 +136,7 @@ public class ProgressDialog extends AlertDialog {
             View view = inflater.inflate(R.layout.alert_dialog_progress, null);
             mProgress = (ProgressBar) view.findViewById(R.id.progress);
             mProgressNumber = (TextView) view.findViewById(R.id.progress_number);
-            mProgressNumberFormat = "%d/%d";
+            mProgressNumberFormat = mContext.getString(R.string.progress_dialog_message_text_number);
             mProgressPercent = (TextView) view.findViewById(R.id.progress_percent);
             mProgressPercentFormat = NumberFormat.getPercentInstance();
             mProgressPercentFormat.setMaximumFractionDigits(0);

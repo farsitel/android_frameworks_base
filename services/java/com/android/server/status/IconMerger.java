@@ -40,18 +40,22 @@ public class IconMerger extends LinearLayout {
         int i;
 
         // get the rightmost one, and see if we even need to do anything
+        // find the first visible one that isn't the more icon
+        int fitLeft = -1;
         int fitRight = -1;
+
         for (i=N-1; i>=0; i--) {
             final View child = getChildAt(i);
             if (child.getVisibility() != GONE) {
-                fitRight = child.getRight();
+                if (mRTL)
+                    fitLeft = child.getLeft();
+                else
+                    fitRight = child.getRight();
                 break;
             }
         }
 
-        // find the first visible one that isn't the more icon
         View moreView = null;
-        int fitLeft = -1;
         int startIndex = -1;
         for (i=0; i<N; i++) {
             final View child = getChildAt(i);
@@ -60,7 +64,10 @@ public class IconMerger extends LinearLayout {
                 startIndex = i+1;
             }
             else if (child.getVisibility() != GONE) {
-                fitLeft = child.getLeft();
+                if (mRTL)
+                    fitRight = child.getRight();
+                else
+                    fitLeft = child.getLeft();
                 break;
             }
         }
@@ -68,27 +75,43 @@ public class IconMerger extends LinearLayout {
         if (moreView == null || startIndex < 0) {
             throw new RuntimeException("Status Bar / IconMerger moreView == null");
         }
-        
-        // if it fits without the more icon, then hide the more icon and update fitLeft
-        // so everything gets pushed left
+
+        // if it fits without the more icon, then hide the more icon and update fitLeft (fitRight)
+        // so everything gets pushed left (right)
         int adjust = 0;
         if (fitRight - fitLeft <= maxWidth) {
-            adjust = fitLeft - moreView.getLeft();
-            fitLeft -= adjust;
-            fitRight -= adjust;
+            if (mRTL) {
+                adjust = moreView.getRight() - fitRight;
+                fitLeft += adjust;
+                fitRight += adjust;
+            } else {
+                adjust = fitLeft - moreView.getLeft();
+                fitLeft -= adjust;
+                fitRight -= adjust;
+            }
             moreView.layout(0, moreView.getTop(), 0, moreView.getBottom());
         }
-        int extra = fitRight - r;
-        int shift = -1;
 
+        int shift = -1;
+        boolean doShift = true;
+
+        int extra = fitRight - r;
         int breakingPoint = fitLeft + extra + adjust;
+        if (mRTL) breakingPoint = r - breakingPoint;
+
         int number = 0;
+
         for (i=startIndex; i<N; i++) {
             final View child = getChildAt(i);
             if (child.getVisibility() != GONE) {
                 int childLeft = child.getLeft();
                 int childRight = child.getRight();
-                if (childLeft < breakingPoint) {
+                boolean hide;
+                if (mRTL)
+                    hide = childRight > breakingPoint;
+                else
+                    hide = childLeft < breakingPoint;
+                if (hide) {
                     // hide this one
                     child.layout(0, child.getTop(), 0, child.getBottom());
                     int n = this.service.getIconNumberForView(child);
@@ -99,12 +122,21 @@ public class IconMerger extends LinearLayout {
                     }
                 } else {
                     // decide how much to shift by
-                    if (shift < 0) {
-                        shift = childLeft - fitLeft;
+                    if (mRTL) {
+                        if (shift < 0) {
+                            shift = fitRight - childRight;
+                        }
+                        // shift this right by shift
+                        child.layout(childLeft+shift, child.getTop(),
+                                        childRight+shift, child.getBottom());
+                    } else {
+                        if (shift < 0) {
+                            shift = childLeft - fitLeft;
+                        }
+                        // shift this left by shift
+                        child.layout(childLeft-shift, child.getTop(),
+                                        childRight-shift, child.getBottom());
                     }
-                    // shift this left by shift
-                    child.layout(childLeft-shift, child.getTop(),
-                                    childRight-shift, child.getBottom());
                 }
             }
         }

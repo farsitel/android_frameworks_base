@@ -46,6 +46,7 @@ import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import android.text.FriBidi;
 import android.util.AttributeSet;
 import android.util.Config;
 import android.util.EventLog;
@@ -1690,7 +1691,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
      * Cache the paddingRight set by the user to append to the scrollbar's size.
      */
     @ViewDebug.ExportedProperty
-    int mUserPaddingRight;
+    protected int mUserPaddingRight;
 
     /**
      * Cache the paddingBottom set by the user to append to the scrollbar's size.
@@ -1837,6 +1838,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
     // Used for debug only
     static long sInstanceCount = 0;
 
+    protected boolean mRTL = false;
+
     /**
      * Simple constructor to use when creating a view from code.
      *
@@ -1844,6 +1847,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
      *        access the current theme, resources, etc.
      */
     public View(Context context) {
+        mRTL = FriBidi.isRTL();
+
         mContext = context;
         mResources = context != null ? context.getResources() : null;
         mViewFlags = SOUND_EFFECTS_ENABLED | HAPTIC_FEEDBACK_ENABLED;
@@ -2131,14 +2136,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
             bottomPadding = padding;
         }
 
-        // If the user specified the padding (either with android:padding or
-        // android:paddingLeft/Top/Right/Bottom), use this padding, otherwise
-        // use the default padding or the padding from the background drawable
-        // (stored at this point in mPadding*)
-        setPadding(leftPadding >= 0 ? leftPadding : mPaddingLeft,
-                topPadding >= 0 ? topPadding : mPaddingTop,
-                rightPadding >= 0 ? rightPadding : mPaddingRight,
-                bottomPadding >= 0 ? bottomPadding : mPaddingBottom);
+        if (mRTL) {
+	        setPadding(rightPadding >= 0 ? rightPadding : mPaddingLeft,
+	                topPadding >= 0 ? topPadding : mPaddingTop,
+	                leftPadding >= 0 ? leftPadding : mPaddingRight,
+	                bottomPadding >= 0 ? bottomPadding : mPaddingBottom);        	
+        } else {
+	        // If the user specified the padding (either with android:padding or
+	        // android:paddingLeft/Top/Right/Bottom), use this padding, otherwise
+	        // use the default padding or the padding from the background drawable
+	        // (stored at this point in mPadding*)
+	        setPadding(leftPadding >= 0 ? leftPadding : mPaddingLeft,
+	                topPadding >= 0 ? topPadding : mPaddingTop,
+	                rightPadding >= 0 ? rightPadding : mPaddingRight,
+	                bottomPadding >= 0 ? bottomPadding : mPaddingBottom);
+        }
 
         if (viewFlagMasks != 0) {
             setFlags(viewFlagValues, viewFlagMasks);
@@ -4020,6 +4032,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
      * @param newConfig The new resource configuration.
      */
     protected void onConfigurationChanged(Configuration newConfig) {
+        mRTL = FriBidi.isRTL();
     }
 
     /**
@@ -5871,7 +5884,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
                                             computeVerticalScrollOffset(),
                                             computeVerticalScrollExtent(), true);
                     // TODO: Deal with RTL languages to position scrollbar on left
-                    left = scrollX + width - size - (mUserPaddingRight & inside);
+                    if (mRTL)
+	                    left = scrollX + (mPaddingLeft & inside);
+                    else
+	                    left = scrollX + width - size - (mUserPaddingRight & inside);
                     top = scrollY + (mPaddingTop & inside);
                     right = left + size;
                     bottom = scrollY + height - (mUserPaddingBottom & inside);
@@ -6851,8 +6867,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
 
         if (horizontalEdges) {
             leftFadeStrength = Math.max(0.0f, Math.min(1.0f, getLeftFadingEdgeStrength()));
-            drawLeft = leftFadeStrength >= 0.0f;
             rightFadeStrength = Math.max(0.0f, Math.min(1.0f, getRightFadingEdgeStrength()));
+            drawLeft = leftFadeStrength >= 0.0f;
             drawRight = rightFadeStrength >= 0.0f;
         }
 
@@ -7565,8 +7581,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
         if ((viewFlags & (SCROLLBARS_VERTICAL|SCROLLBARS_HORIZONTAL)) != 0) {
             // TODO: Deal with RTL languages to adjust left padding instead of right.
             if ((viewFlags & SCROLLBARS_VERTICAL) != 0) {
-                right += (viewFlags & SCROLLBARS_INSET_MASK) == 0
-                        ? 0 : getVerticalScrollbarWidth();
+            	if (mRTL) {
+	                left += (viewFlags & SCROLLBARS_INSET_MASK) == 0
+                    		? 0 : getVerticalScrollbarWidth();
+            	} else {
+	                right += (viewFlags & SCROLLBARS_INSET_MASK) == 0
+	                        ? 0 : getVerticalScrollbarWidth();
+            	}
             }
             if ((viewFlags & SCROLLBARS_HORIZONTAL) == 0) {
                 bottom += (viewFlags & SCROLLBARS_INSET_MASK) == 0

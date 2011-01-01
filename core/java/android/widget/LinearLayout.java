@@ -19,6 +19,7 @@ package android.widget;
 import com.android.internal.R;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -48,6 +49,8 @@ import android.widget.RemoteViews.RemoteView;
 public class LinearLayout extends ViewGroup {
     public static final int HORIZONTAL = 0;
     public static final int VERTICAL = 1;
+    public static final int HORIZONTAL_LTR = 3;
+    public static final int HORIZONTAL_RTL = 4;
 
     /**
      * Whether the children of this layout are baseline aligned.  Only applicable
@@ -154,6 +157,15 @@ public class LinearLayout extends ViewGroup {
      */
     public boolean isBaselineAligned() {
         return mBaselineAligned;
+    }
+
+    protected void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (mOrientation == HORIZONTAL_LTR) {
+            mRTL = false;
+        } else if (mOrientation == HORIZONTAL_RTL) {
+            mRTL = true;
+        }
     }
 
     /**
@@ -1104,8 +1116,15 @@ public class LinearLayout extends ViewGroup {
                 if (gravity < 0) {
                     gravity = minorGravity;
                 }
-                
-                switch (gravity & Gravity.HORIZONTAL_GRAVITY_MASK) {
+
+                int visualHorizontalGravity = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
+                if (mRTL) {
+                    if (visualHorizontalGravity == Gravity.LEFT)
+                        visualHorizontalGravity = Gravity.RIGHT;
+                    else if (visualHorizontalGravity == Gravity.RIGHT)
+                        visualHorizontalGravity = Gravity.LEFT;
+                }
+                switch (visualHorizontalGravity) {
                     case Gravity.LEFT:
                         childLeft = paddingLeft + lp.leftMargin;
                         break;
@@ -1119,7 +1138,10 @@ public class LinearLayout extends ViewGroup {
                         childLeft = childRight - childWidth - lp.rightMargin;
                         break;
                     default:
-                        childLeft = paddingLeft;
+                        if (mRTL)
+                            childLeft = childRight - childWidth;
+                        else
+                            childLeft = paddingLeft;
                         break;
                 }
                 
@@ -1157,7 +1179,7 @@ public class LinearLayout extends ViewGroup {
 
         final int count = getVirtualChildCount();
 
-        final int majorGravity = mGravity & Gravity.HORIZONTAL_GRAVITY_MASK;
+        int majorGravity = mGravity & Gravity.HORIZONTAL_GRAVITY_MASK;
         final int minorGravity = mGravity & Gravity.VERTICAL_GRAVITY_MASK;
 
         final boolean baselineAligned = mBaselineAligned;
@@ -1165,103 +1187,192 @@ public class LinearLayout extends ViewGroup {
         final int[] maxAscent = mMaxAscent;
         final int[] maxDescent = mMaxDescent;
 
-        if (majorGravity != Gravity.LEFT) {
+        if (mRTL) {
+            childLeft = mRight - mLeft + mPaddingLeft - mTotalLength;
             switch (majorGravity) {
-                case Gravity.RIGHT:
-                    // mTotalLength contains the padding already, we add the left
-                    // padding to compensate
-                    childLeft = mRight - mLeft + mPaddingLeft - mTotalLength;
-                    break;
+            case Gravity.RIGHT:
+                childLeft = mPaddingLeft;
+                break;
 
-                case Gravity.CENTER_HORIZONTAL:
-                    childLeft += ((mRight - mLeft) - mTotalLength) / 2;
-                    break;
+            case Gravity.CENTER_HORIZONTAL:
+                childLeft = mPaddingLeft + ((mRight - mLeft) - mTotalLength) / 2;
+                break;
             }
-       }
-
-        for (int i = 0; i < count; i++) {
-            final View child = getVirtualChildAt(i);
-
-            if (child == null) {
-                childLeft += measureNullChild(i);
-            } else if (child.getVisibility() != GONE) {
-                final int childWidth = child.getMeasuredWidth();
-                final int childHeight = child.getMeasuredHeight();
-                int childBaseline = -1;
-
-                final LinearLayout.LayoutParams lp =
-                        (LinearLayout.LayoutParams) child.getLayoutParams();
-
-                if (baselineAligned && lp.height != LayoutParams.MATCH_PARENT) {
-                    childBaseline = child.getBaseline();
-                }
-                
-                int gravity = lp.gravity;
-                if (gravity < 0) {
-                    gravity = minorGravity;
-                }
-                
-                switch (gravity & Gravity.VERTICAL_GRAVITY_MASK) {
-                    case Gravity.TOP:
-                        childTop = paddingTop + lp.topMargin;
-                        if (childBaseline != -1) {
-                            childTop += maxAscent[INDEX_TOP] - childBaseline;
-                        }
+        } else {
+            if (majorGravity != Gravity.LEFT) {
+                switch (majorGravity) {
+                    case Gravity.RIGHT:
+                        // mTotalLength contains the padding already, we add the left
+                        // padding to compensate
+                        childLeft = mRight - mLeft + mPaddingLeft - mTotalLength;
                         break;
 
-                    case Gravity.CENTER_VERTICAL:
-                        // Removed support for baseline alignment when layout_gravity or
-                        // gravity == center_vertical. See bug #1038483.
-                        // Keep the code around if we need to re-enable this feature
-                        // if (childBaseline != -1) {
-                        //     // Align baselines vertically only if the child is smaller than us
-                        //     if (childSpace - childHeight > 0) {
-                        //         childTop = paddingTop + (childSpace / 2) - childBaseline;
-                        //     } else {
-                        //         childTop = paddingTop + (childSpace - childHeight) / 2;
-                        //     }
-                        // } else {
-                        childTop = paddingTop + ((childSpace - childHeight) / 2)
-                                + lp.topMargin - lp.bottomMargin;
-                        break;
-
-                    case Gravity.BOTTOM:
-                        childTop = childBottom - childHeight - lp.bottomMargin;
-                        if (childBaseline != -1) {
-                            int descent = child.getMeasuredHeight() - childBaseline;
-                            childTop -= (maxDescent[INDEX_BOTTOM] - descent);
-                        }
-                        break;
-                    default:
-                        childTop = paddingTop;
+                    case Gravity.CENTER_HORIZONTAL:
+                        childLeft += ((mRight - mLeft) - mTotalLength) / 2;
                         break;
                 }
+           }
+        }
 
-                childLeft += lp.leftMargin;
-                setChildFrame(child, childLeft + getLocationOffset(child), childTop,
-                        childWidth, childHeight);
-                childLeft += childWidth + lp.rightMargin +
-                        getNextLocationOffset(child);
+        if (mRTL) {
+            for (int i = count - 1; i >= 0; i--) {
+                View child;
+                child = getVirtualChildAt(i);
 
-                i += getChildrenSkipCount(child, i);
+                if (child == null) {
+                    childLeft += measureNullChild(i);
+                } else if (child.getVisibility() != GONE) {
+                    final int childWidth = child.getMeasuredWidth();
+                    final int childHeight = child.getMeasuredHeight();
+                    int childBaseline = -1;
+
+                    final LinearLayout.LayoutParams lp =
+                            (LinearLayout.LayoutParams) child.getLayoutParams();
+
+                    if (baselineAligned && lp.height != LayoutParams.FILL_PARENT) {
+                        childBaseline = child.getBaseline();
+                    }
+
+                    int gravity = lp.gravity;
+                    if (gravity < 0) {
+                        gravity = minorGravity;
+                    }
+
+                    switch (gravity & Gravity.VERTICAL_GRAVITY_MASK) {
+                        case Gravity.TOP:
+                            childTop = paddingTop + lp.topMargin;
+                            if (childBaseline != -1) {
+                                childTop += maxAscent[INDEX_TOP] - childBaseline;
+                            }
+                            break;
+
+                        case Gravity.CENTER_VERTICAL:
+                            // Removed support for baseline alignment when layout_gravity or
+                            // gravity == center_vertical. See bug #1038483.
+                            // Keep the code around if we need to re-enable this feature
+                            // if (childBaseline != -1) {
+                            //     // Align baselines vertically only if the child is smaller than us
+                            //     if (childSpace - childHeight > 0) {
+                            //         childTop = paddingTop + (childSpace / 2) - childBaseline;
+                            //     } else {
+                            //         childTop = paddingTop + (childSpace - childHeight) / 2;
+                            //     }
+                            // } else {
+                            childTop = paddingTop + ((childSpace - childHeight) / 2)
+                                    + lp.topMargin - lp.bottomMargin;
+                            break;
+
+                        case Gravity.BOTTOM:
+                            childTop = childBottom - childHeight - lp.bottomMargin;
+                            if (childBaseline != -1) {
+                                int descent = child.getMeasuredHeight() - childBaseline;
+                                childTop -= (maxDescent[INDEX_BOTTOM] - descent);
+                            }
+                            break;
+                        default:
+                            childTop = paddingTop;
+                            break;
+                    }
+
+                    childLeft += lp.leftMargin;
+                    setChildFrame(child, childLeft + getLocationOffset(child), childTop,
+                            childWidth, childHeight);
+                    childLeft += childWidth + lp.rightMargin + getNextLocationOffset(child);
+
+                    i -= getChildrenSkipCount(child, i);
+                }
+            }
+        } else {
+            for (int i = 0; i < count; i++) {
+                View child;
+                child = getVirtualChildAt(i);
+
+                if (child == null) {
+                    childLeft += measureNullChild(i);
+                } else if (child.getVisibility() != GONE) {
+                    final int childWidth = child.getMeasuredWidth();
+                    final int childHeight = child.getMeasuredHeight();
+                    int childBaseline = -1;
+
+                    final LinearLayout.LayoutParams lp =
+                            (LinearLayout.LayoutParams) child.getLayoutParams();
+
+                    if (baselineAligned && lp.height != LayoutParams.FILL_PARENT) {
+                        childBaseline = child.getBaseline();
+                    }
+
+                    int gravity = lp.gravity;
+                    if (gravity < 0) {
+                        gravity = minorGravity;
+                    }
+
+                    switch (gravity & Gravity.VERTICAL_GRAVITY_MASK) {
+                        case Gravity.TOP:
+                            childTop = paddingTop + lp.topMargin;
+                            if (childBaseline != -1) {
+                                childTop += maxAscent[INDEX_TOP] - childBaseline;
+                            }
+                            break;
+
+                        case Gravity.CENTER_VERTICAL:
+                            // Removed support for baseline alignment when layout_gravity or
+                            // gravity == center_vertical. See bug #1038483.
+                            // Keep the code around if we need to re-enable this feature
+                            // if (childBaseline != -1) {
+                            //     // Align baselines vertically only if the child is smaller than us
+                            //     if (childSpace - childHeight > 0) {
+                            //         childTop = paddingTop + (childSpace / 2) - childBaseline;
+                            //     } else {
+                            //         childTop = paddingTop + (childSpace - childHeight) / 2;
+                            //     }
+                            // } else {
+                            childTop = paddingTop + ((childSpace - childHeight) / 2)
+                                    + lp.topMargin - lp.bottomMargin;
+                            break;
+
+                        case Gravity.BOTTOM:
+                            childTop = childBottom - childHeight - lp.bottomMargin;
+                            if (childBaseline != -1) {
+                                int descent = child.getMeasuredHeight() - childBaseline;
+                                childTop -= (maxDescent[INDEX_BOTTOM] - descent);
+                            }
+                            break;
+                        default:
+                            childTop = paddingTop;
+                            break;
+                    }
+
+                    childLeft += lp.leftMargin;
+                    setChildFrame(child, childLeft + getLocationOffset(child), childTop,
+                            childWidth, childHeight);
+                    childLeft += childWidth + lp.rightMargin +
+                    getNextLocationOffset(child);
+
+                    i += getChildrenSkipCount(child, i);
+                }
             }
         }
     }
 
-    private void setChildFrame(View child, int left, int top, int width, int height) {        
+    private void setChildFrame(View child, int left, int top, int width, int height) {
         child.layout(left, top, left + width, top + height);
     }
     
     /**
      * Should the layout be a column or a row.
-     * @param orientation Pass HORIZONTAL or VERTICAL. Default
-     * value is HORIZONTAL.
+     * @param orientation Pass HORIZONTAL, HORIZONTAL_LTR,
+     * HORIZONTAL_RTL or VERTICAL. Default value is HORIZONTAL.
      * 
      * @attr ref android.R.styleable#LinearLayout_orientation
      */
     public void setOrientation(int orientation) {
         if (mOrientation != orientation) {
             mOrientation = orientation;
+            if (mOrientation == HORIZONTAL_LTR) {
+                mRTL = false;
+            } else if (mOrientation == HORIZONTAL_RTL) {
+                mRTL = true;
+            }
             requestLayout();
         }
     }
@@ -1321,7 +1432,7 @@ public class LinearLayout extends ViewGroup {
     
     @Override
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new LinearLayout.LayoutParams(getContext(), attrs);
+        return new LinearLayout.LayoutParams(getContext(), attrs, mRTL);
     }
 
     /**
@@ -1334,7 +1445,7 @@ public class LinearLayout extends ViewGroup {
      */
     @Override
     protected LayoutParams generateDefaultLayoutParams() {
-        if (mOrientation == HORIZONTAL) {
+        if (mOrientation == HORIZONTAL || mOrientation == HORIZONTAL_LTR || mOrientation == HORIZONTAL_RTL) {
             return new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         } else if (mOrientation == VERTICAL) {
             return new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
@@ -1394,8 +1505,13 @@ public class LinearLayout extends ViewGroup {
         /**
          * {@inheritDoc}
          */
+        @Deprecated
         public LayoutParams(Context c, AttributeSet attrs) {
-            super(c, attrs);
+            this(c, attrs, false);
+        }
+
+        public LayoutParams(Context c, AttributeSet attrs, boolean rtl) {
+            super(c, attrs, false);
             TypedArray a =
                     c.obtainStyledAttributes(attrs, com.android.internal.R.styleable.LinearLayout_Layout);
 
@@ -1403,6 +1519,8 @@ public class LinearLayout extends ViewGroup {
             gravity = a.getInt(com.android.internal.R.styleable.LinearLayout_Layout_layout_gravity, -1);
 
             a.recycle();
+            if (rtl)
+                doMirror();
         }
 
         /**
@@ -1426,6 +1544,16 @@ public class LinearLayout extends ViewGroup {
         public LayoutParams(int width, int height, float weight) {
             super(width, height);
             this.weight = weight;
+        }
+
+        @Override
+        protected void doMirror() {
+            super.doMirror();
+
+            if (gravity == Gravity.LEFT)
+                gravity = Gravity.RIGHT;
+            else if (gravity == Gravity.RIGHT)
+                gravity = Gravity.LEFT;
         }
 
         /**

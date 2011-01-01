@@ -412,9 +412,14 @@ public final class IconMenuView extends ViewGroup implements ItemInvoker, MenuVi
             itemWidth = (menuWidth - mVerticalDividerWidth * (numItemsForRow[row] - 1))
                     / (float)numItemsForRow[row];
             
+            int itemPosFirstInRow = itemPos;
             for (int itemPosOnRow = 0; itemPosOnRow < numItemsForRow[row]; itemPosOnRow++) {
                 // Tell the child to be exactly this size
-                child = getChildAt(itemPos);
+                if (mRTL) {
+                    child = getChildAt(numItemsForRow[row] - 1 - itemPosOnRow + itemPosFirstInRow);
+                } else {
+                    child = getChildAt(itemPos);
+                }
                 child.measure(MeasureSpec.makeMeasureSpec((int) itemWidth, MeasureSpec.EXACTLY),
                         MeasureSpec.makeMeasureSpec((int) itemHeight, MeasureSpec.EXACTLY));
                 
@@ -534,7 +539,7 @@ public final class IconMenuView extends ViewGroup implements ItemInvoker, MenuVi
 
     @Override
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new IconMenuView.LayoutParams(getContext(), attrs);
+        return new IconMenuView.LayoutParams(getContext(), attrs, mRTL);
     }
 
     @Override
@@ -811,8 +816,8 @@ public final class IconMenuView extends ViewGroup implements ItemInvoker, MenuVi
         int desiredWidth;
         int maxNumItemsOnRow;
         
-        public LayoutParams(Context c, AttributeSet attrs) {
-            super(c, attrs);
+        public LayoutParams(Context c, AttributeSet attrs, boolean rtl) {
+            super(c, attrs, rtl);
         }
 
         public LayoutParams(int width, int height) {

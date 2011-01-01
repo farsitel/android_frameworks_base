@@ -244,7 +244,11 @@ public abstract class AbsSeekBar extends ProgressBar {
         }
         
         // Canvas will be translated, so 0,0 is where we start drawing
-        thumb.setBounds(thumbPos, topBound, thumbPos + thumbWidth, bottomBound);
+        if (mRTL) {
+            thumb.setBounds(available - thumbPos - 1, topBound, available - thumbPos + thumbWidth - 1, bottomBound);
+        } else {
+            thumb.setBounds(thumbPos, topBound, thumbPos + thumbWidth, bottomBound);
+        }
     }
     
     @Override
@@ -320,6 +324,9 @@ public abstract class AbsSeekBar extends ProgressBar {
         final int width = getWidth();
         final int available = width - mPaddingLeft - mPaddingRight;
         int x = (int)event.getX();
+        if (mRTL) {
+            x = width - x;
+        }
         float scale;
         float progress = 0;
         if (x < mPaddingLeft) {
@@ -368,8 +375,16 @@ public abstract class AbsSeekBar extends ProgressBar {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        int savedKeyCode = keyCode;
         if (isEnabled()) {
             int progress = getProgress();
+            if (mRTL) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    keyCode = KeyEvent.KEYCODE_DPAD_RIGHT;
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    keyCode = KeyEvent.KEYCODE_DPAD_LEFT;
+                }
+            }
             switch (keyCode) {
                 case KeyEvent.KEYCODE_DPAD_LEFT:
                     if (progress <= 0) break;
@@ -385,7 +400,7 @@ public abstract class AbsSeekBar extends ProgressBar {
             }
         }
 
-        return super.onKeyDown(keyCode, event);
+        return super.onKeyDown(savedKeyCode, event);
     }
 
 }

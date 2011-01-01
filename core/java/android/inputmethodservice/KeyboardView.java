@@ -128,7 +128,7 @@ public class KeyboardView extends View implements View.OnClickListener {
     private static final int[] KEY_DELETE = { Keyboard.KEYCODE_DELETE };
     private static final int[] LONG_PRESSABLE_STATE_SET = { R.attr.state_long_pressable };   
     
-    private Keyboard mKeyboard;
+    protected Keyboard mKeyboard;
     private int mCurrentKeyIndex = NOT_A_KEY;
     private int mLabelTextSize;
     private int mKeyTextSize;
@@ -559,7 +559,7 @@ public class KeyboardView extends View implements View.OnClickListener {
         dismissPopupKeyboard();
     }
 
-    private CharSequence adjustCase(CharSequence label) {
+    protected CharSequence adjustCase(CharSequence label) {
         if (mKeyboard.isShifted() && label != null && label.length() < 3
                 && Character.isLowerCase(label.charAt(0))) {
             label = label.toString().toUpperCase();

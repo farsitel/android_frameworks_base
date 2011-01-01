@@ -368,9 +368,9 @@ public class MediaController extends FrameLayout {
 
         mFormatBuilder.setLength(0);
         if (hours > 0) {
-            return mFormatter.format("%d:%02d:%02d", hours, minutes, seconds).toString();
+            return mFormatter.format("%Ld:%L02d:%L02d", hours, minutes, seconds).toString();
         } else {
-            return mFormatter.format("%02d:%02d", minutes, seconds).toString();
+            return mFormatter.format("%L02d:%L02d", minutes, seconds).toString();
         }
     }
 

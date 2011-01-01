@@ -22,6 +22,7 @@ package android.text;
  * another CharSequence, except that a specified range of characters are
  * mirrored from a different char array instead.
  */
+@Deprecated
 public class AlteredCharSequence
 implements CharSequence, GetChars
 {

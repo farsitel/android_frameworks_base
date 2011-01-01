@@ -682,8 +682,13 @@ public class RelativeLayout extends ViewGroup {
                 }
                 return true;
             } else {
-                params.mLeft = mPaddingLeft + params.leftMargin;
-                params.mRight = params.mLeft + child.getMeasuredWidth();
+                if (mRTL) {
+                    params.mRight = myWidth - mPaddingRight - params.rightMargin;
+                    params.mLeft = params.mRight - child.getMeasuredWidth();
+                } else {
+                    params.mLeft = mPaddingLeft + params.leftMargin;
+                    params.mRight = params.mLeft + child.getMeasuredWidth();
+                }
             }
         }
         return rules[ALIGN_PARENT_RIGHT] != 0;
@@ -917,7 +922,7 @@ public class RelativeLayout extends ViewGroup {
 
     @Override
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new RelativeLayout.LayoutParams(getContext(), attrs);
+        return new RelativeLayout.LayoutParams(getContext(), attrs, mRTL);
     }
 
     /**
@@ -1046,8 +1051,13 @@ public class RelativeLayout extends ViewGroup {
         @ViewDebug.ExportedProperty
         public boolean alignWithParent;
 
+        @Deprecated
         public LayoutParams(Context c, AttributeSet attrs) {
-            super(c, attrs);
+            this(c, attrs, false);
+        }
+
+        public LayoutParams(Context c, AttributeSet attrs, boolean rtl) {
+            super(c, attrs, false);
 
             TypedArray a = c.obtainStyledAttributes(attrs,
                     com.android.internal.R.styleable.RelativeLayout_Layout);
@@ -1113,6 +1123,8 @@ public class RelativeLayout extends ViewGroup {
             }
 
             a.recycle();
+            if (rtl)
+                doMirror();
         }
 
         public LayoutParams(int w, int h) {
@@ -1131,6 +1143,25 @@ public class RelativeLayout extends ViewGroup {
          */
         public LayoutParams(ViewGroup.MarginLayoutParams source) {
             super(source);
+        }
+
+        @Override
+        protected void doMirror() {
+            super.doMirror();
+
+            int temp;
+
+            temp = mRules[LEFT_OF];
+            mRules[LEFT_OF] = mRules[RIGHT_OF];
+            mRules[RIGHT_OF] = temp;
+
+            temp = mRules[ALIGN_LEFT];
+            mRules[ALIGN_LEFT] = mRules[ALIGN_RIGHT];
+            mRules[ALIGN_RIGHT] = temp;
+
+            temp = mRules[ALIGN_PARENT_LEFT];
+            mRules[ALIGN_PARENT_LEFT] = mRules[ALIGN_PARENT_RIGHT];
+            mRules[ALIGN_PARENT_RIGHT] = temp;
         }
 
         @Override

@@ -17,6 +17,7 @@
 package android.text.format;
 
 import android.content.res.Resources;
+import android.content.Context;
 
 import java.util.Locale;
 import java.util.TimeZone;
@@ -46,6 +47,8 @@ public class Time {
      * all zero, and the date is displayed the same in all time zones.
      */
     public boolean allDay;
+
+    boolean useLocalizedDigits = false;
 
     /**
      * Seconds [0-61] (2 leap seconds allowed)
@@ -108,6 +111,11 @@ public class Time {
     public String timezone;
 
     /*
+     * Specifies if the calling context has Jalali calendar enabled.
+     */
+    private boolean mJalali = false;
+
+    /*
      * Define symbolic constants for accessing the fields in this class. Used in
      * getActualMaximum().
      */
@@ -164,11 +172,29 @@ public class Time {
     }
 
     /**
+     * Same as Time(String timezone), but with context to pass to Jalali.
+     */
+    public Time(String timezone, Context context) {
+        this(timezone);
+        mJalali = Jalali.isJalali(context);
+        useLocalizedDigits = true;
+    }
+
+    /**
      * Construct a Time object in the default timezone. The time is initialized to
      * Jan 1, 1970.
      */
     public Time() {
         this(TimeZone.getDefault().getID());
+    }
+
+    /**
+     * Same as Time(), but with context to pass to Jalali.
+     */
+    public Time(Context context) {
+        this();
+        mJalali = Jalali.isJalali(context);
+        useLocalizedDigits = true;
     }
 
     /**
@@ -179,6 +205,14 @@ public class Time {
      */
     public Time(Time other) {
         set(other);
+    }
+
+    /**
+     * Gets a context and decides on Jalali status based on it.
+     */
+    public void updateJalali(Context context) {
+        mJalali = Jalali.isJalali(context);
+        useLocalizedDigits = true;
     }
 
     /**
@@ -363,7 +397,14 @@ public class Time {
                 sLocale = locale;
             }
 
-            return format1(format);
+            if (mJalali) {
+                format = Jalali.format(format, this);
+            }
+
+           	if (useLocalizedDigits)
+           	    return String.format("%Ls", format1(format));
+           	else
+           	    return format1(format);
         }
     }
 
@@ -560,6 +601,8 @@ public class Time {
         this.yearDay = that.yearDay;
         this.isDst = that.isDst;
         this.gmtoff = that.gmtoff;
+        this.mJalali = that.mJalali;
+        this.useLocalizedDigits = that.useLocalizedDigits;
     }
 
     /**

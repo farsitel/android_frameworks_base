@@ -131,6 +131,7 @@ extern int register_android_debug_JNITest(JNIEnv* env);
 extern int register_android_nio_utils(JNIEnv* env);
 extern int register_android_pim_EventRecurrence(JNIEnv* env);
 extern int register_android_text_format_Time(JNIEnv* env);
+extern int register_android_text_FriBidi(JNIEnv* env);
 extern int register_android_os_Debug(JNIEnv* env);
 extern int register_android_os_ParcelFileDescriptor(JNIEnv *env);
 extern int register_android_os_Power(JNIEnv *env);
@@ -147,7 +148,7 @@ extern int register_android_net_TrafficStats(JNIEnv* env);
 extern int register_android_net_wifi_WifiManager(JNIEnv* env);
 extern int register_android_security_Md5MessageDigest(JNIEnv *env);
 extern int register_android_text_AndroidCharacter(JNIEnv *env);
-extern int register_android_text_AndroidBidi(JNIEnv *env);
+//extern int register_android_text_AndroidBidi(JNIEnv *env);
 extern int register_android_text_KeyCharacterMap(JNIEnv *env);
 extern int register_android_opengl_classes(JNIEnv *env);
 extern int register_android_bluetooth_HeadsetBase(JNIEnv* env);
@@ -616,7 +617,7 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv)
         property_get("dalvik.vm.heapsize", propBuf, "16m");
     }
     strcpy(heapsizeOptsBuf+4, propBuf);
-    LOGI("Heap size: %s", heapsizeOptsBuf);
+    //LOGI("Heap size: %s", heapsizeOptsBuf);
     opt.optionString = heapsizeOptsBuf;
     mOptions.add(opt);
 
@@ -1201,6 +1202,7 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_android_util_Log),
     REG_JNI(register_android_util_FloatMath),
     REG_JNI(register_android_text_format_Time),
+    REG_JNI(register_android_text_FriBidi),
     REG_JNI(register_android_pim_EventRecurrence),
     REG_JNI(register_android_content_AssetManager),
     REG_JNI(register_android_content_StringBlock),
@@ -1208,7 +1210,7 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_android_emoji_EmojiFactory),
     REG_JNI(register_android_security_Md5MessageDigest),
     REG_JNI(register_android_text_AndroidCharacter),
-    REG_JNI(register_android_text_AndroidBidi),
+//    REG_JNI(register_android_text_AndroidBidi),
     REG_JNI(register_android_text_KeyCharacterMap),
     REG_JNI(register_android_os_Process),
     REG_JNI(register_android_os_Binder),

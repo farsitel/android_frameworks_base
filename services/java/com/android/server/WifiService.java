@@ -93,7 +93,7 @@ import com.android.internal.R;
  */
 public class WifiService extends IWifiManager.Stub {
     private static final String TAG = "WifiService";
-    private static final boolean DBG = true;
+    private static final boolean DBG = false;
     private static final Pattern scanResultPattern = Pattern.compile("\t+");
     private final WifiStateTracker mWifiStateTracker;
     /* TODO: fetch a configurable interface */
