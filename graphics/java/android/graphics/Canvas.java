@@ -1247,7 +1247,8 @@ public class Canvas {
             (text.length - index - count)) < 0) {
             throw new IndexOutOfBoundsException();
         }
-        native_drawText(mNativeCanvas, text, index, count, x, y,
+        String textS = new FriBidi(new String(text, index, count)).reorderOnce();
+        native_drawText(mNativeCanvas, textS, 0, count, x, y,
                         paint.mNativePaint);
     }
 
@@ -1266,6 +1267,10 @@ public class Canvas {
         native_drawString(new FriBidi(text).reorderOnce(), x, y, paint);
     }
 
+    /**
+     * For internal use. This function skips the FriBidi part.
+     * @hide
+     */
     public void _drawText(String text, float x, float y, Paint paint) {
         native_drawString(text, x, y, paint);
     }
@@ -1291,6 +1296,15 @@ public class Canvas {
 
         native_drawText(mNativeCanvas, new FriBidi(text).reorderOnce(), start, end, x, y,
                         paint.mNativePaint);
+    }
+
+    /**
+     * For internal use. This function skips the FriBidi part.
+     * @hide
+     */
+    public void _drawText(String text, int start, int end,
+                          float x, float y, Paint paint) {
+        native_drawText(mNativeCanvas, text, start, end, x, y, paint.mNativePaint);
     }
 
     /**
@@ -1328,25 +1342,6 @@ public class Canvas {
             TextUtils.getChars(text, start, end, buf, 0);
             String s = new String(buf, 0 , end - start);
             drawText(s, 0, end - start, x, y, paint);
-            TemporaryBuffer.recycle(buf);
-        }
-    }
-
-    public void _drawText(CharSequence text, int start, int end, float x,
-                         float y, Paint paint) {
-        if (text instanceof String || text instanceof SpannedString ||
-            text instanceof SpannableString) {
-            native_drawText(mNativeCanvas, text.toString(), start, end, x, y,
-                            paint.mNativePaint);
-        }
-        else if (text instanceof GraphicsOperations) {
-            ((GraphicsOperations) text).drawText(this, start, end, x, y,
-                                                     paint);
-        }
-        else {
-            char[] buf = TemporaryBuffer.obtain(end - start);
-            TextUtils.getChars(text, start, end, buf, 0);
-            drawText(buf, 0, end - start, x, y, paint);
             TemporaryBuffer.recycle(buf);
         }
     }

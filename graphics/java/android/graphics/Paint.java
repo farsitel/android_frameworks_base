@@ -999,11 +999,11 @@ public class Paint {
      * @return      The width of the text
      */
     public float measureText(char[] text, int index, int count) {
-        String textS = new FriBidi(new String(text)).before_reorder;
-        if (!mHasCompatScaling) return native_measureText(textS, index, count);
+        String textS = new FriBidi(new String(text, index, count)).before_reorder;
+        if (!mHasCompatScaling) return native_measureText(textS, 0, count);
         final float oldSize = getTextSize();
         setTextSize(oldSize*mCompatScaling);
-        float w = native_measureText(textS, index, count);
+        float w = native_measureText(textS, 0, count);
         setTextSize(oldSize);
         return w*mInvCompatScaling;
     }
@@ -1028,6 +1028,10 @@ public class Paint {
         return w*mInvCompatScaling;
     }
 
+    /**
+     * For internal use. This function skips the FriBidi part.
+     * @hide
+     */
     public float _measureText(String text, int start, int end) {
         if (!mHasCompatScaling) return native_measureText(text, start, end);
         final float oldSize = getTextSize();
@@ -1207,14 +1211,14 @@ public class Paint {
             throw new ArrayIndexOutOfBoundsException();
         }
         
-        String textS = new FriBidi(new String(text)).before_reorder;
+        String textS = new FriBidi(new String(text, index, count)).before_reorder;
 
         if (!mHasCompatScaling) {
-            return native_getTextWidths(mNativePaint, textS, index, count, widths);
+            return native_getTextWidths(mNativePaint, textS, 0, count, widths);
         }
         final float oldSize = getTextSize();
         setTextSize(oldSize*mCompatScaling);
-        int res = native_getTextWidths(mNativePaint, textS, index, count, widths);
+        int res = native_getTextWidths(mNativePaint, textS, 0, count, widths);
         setTextSize(oldSize);
         for (int i=0; i<res; i++) {
             widths[i] *= mInvCompatScaling;
@@ -1253,6 +1257,10 @@ public class Paint {
     	return result;
     }
 
+    /**
+     * For internal use. This function skips the FriBidi part.
+     * @hide
+     */
     public int _getTextWidths(String text, int start, int end, float[] widths) {
         if ((start | end | (end - start) | (text.length() - end)) < 0) {
             throw new IndexOutOfBoundsException();
