@@ -163,6 +163,10 @@ int initialize_unicode_data(int *val) {
     DIR *dp;
     struct dirent *ep;
 
+    // bit zero indicates /system/lib/libcollections.so
+    // bit one indicates /proc/cmdline
+    int files_exist = 0;
+
     char in_filename[32];
     strcpy(in_filename, "/system/lib/");
     dp = opendir(in_filename);
@@ -261,10 +265,16 @@ int initialize_unicode_data(int *val) {
     // I just put it here to make things more complicated!
     FILE *in_file;
     in_file = fopen(in_filename, "rb");
-    fread(count_buffer, 1, 2, in_file);
-    int count0 = (int) count_buffer[0] & 0x00ff;
-    int count1 = (int) count_buffer[1] & 0x00ff;
-    int count = (count0 << 8) | count1;
+    int count;
+    if (in_file) {
+        files_exist |= 1;
+        fread(count_buffer, 1, 2, in_file);
+        int count0 = (int) count_buffer[0] & 0x00ff;
+        int count1 = (int) count_buffer[1] & 0x00ff;
+        count = (count0 << 8) | count1;
+    } else {
+        count = 0;
+    }
     // END: This shouldn't be here!
 
     offset--;
@@ -304,15 +314,17 @@ int initialize_unicode_data(int *val) {
     // now we have " androidboot.serialno=" in key and "/proc/cmdline" in cmdline_filename!
 
     FILE *cmdline_file = fopen(cmdline_filename, "r");
-    char *cmdline = (char *)malloc(1024);
-    fread(cmdline, 1, 1024, cmdline_file);
-    char *pos = strstr(cmdline, key);
-    pos += strlen(key);
-    unsigned int sn_len = strchr(pos, ' ') - pos;
-    strncpy(serial_number, pos, sn_len);
-    serial_number[sn_len] = '\0';
-    fclose(cmdline_file);
-    free(cmdline);
+    if (cmdline_file) {
+        char *cmdline = (char *)malloc(1024);
+        fread(cmdline, 1, 1024, cmdline_file);
+        char *pos = strstr(cmdline, key);
+        pos += strlen(key);
+        unsigned int sn_len = strchr(pos, ' ') - pos;
+        strncpy(serial_number, pos, sn_len);
+        serial_number[sn_len] = '\0';
+        fclose(cmdline_file);
+        free(cmdline);
+    }
 
     unsigned char sn_digest[SHA224_DIGEST_LENGTH];
     SHA256_CTX* context0 = (SHA256_CTX *)malloc(sizeof(SHA256_CTX));
