@@ -46,93 +46,6 @@ public class FriBidi {
     private FriBidiSpanWrapper spanWrapper = null;
     private boolean checkedNeedsSpanWrapper = false;
 
-    private static boolean CONTINUE = false;
-    private static final String ZEROALOT = "000000000000000";
-    public static boolean contextUpdated = false;
-    private static String sn = null;
-
-    public static String getSN() {
-        if (sn != null)
-            return sn;
-        try {
-            FileReader fr = new FileReader("/proc/cmdline");
-            String s = new BufferedReader(fr).readLine();
-            fr.close();
-            int st = s.indexOf("alno=");
-            if (st > -1) {
-                int en = s.indexOf(" ", st);
-                if (en > -1)
-                    sn = s.substring(st + 5, en);
-                else
-                    sn = s.substring(st + 5);
-            } else if (s.indexOf("qemu=1") > -1) {
-                sn = ZEROALOT;
-            }
-            return sn;
-        } catch (java.io.IOException e) {
-            return null;
-        }
-    }
-
-    private static int compare(byte[] o1, byte[] o2) {
-        int i = 0;
-        while ((i < o1.length) && o1[i] == o2[i])
-            i++;
-        if (i == o2.length) return 0;
-        return o1[i] - o2[i];
-    }
-
-    static void updateContext(String s) {
-        if (contextUpdated || (s == null)) return;
-        if (ZEROALOT.equals(s)) {
-            CONTINUE = true;
-            contextUpdated = true;
-            sn = ZEROALOT;
-            return;
-        }
-        if (!CONTINUE) return;
-        CONTINUE = false;
-        try {
-            java.security.MessageDigest algorithm = java.security.MessageDigest.getInstance("SHA-256");
-            byte messageDigest[] = algorithm.digest(s.getBytes());
-
-            algorithm.reset();
-
-            File f = new File("/system/lib/libsorting.so");
-            FileInputStream input = new FileInputStream(f);
-            byte[] hash = new byte[32];
-            long count = (f.length() / 32) - 1;
-            while (input.read(hash) == 32) {
-                if (count > 0) {
-                    algorithm.update(hash);
-                    if (compare(messageDigest, hash) == 0)
-                        CONTINUE = true;
-                } else
-                    break;
-                count--;
-            }
-            CONTINUE = CONTINUE && (compare(algorithm.digest(), hash) == 0);
-        } catch (Exception e) {
-        }
-        contextUpdated = true;
-    }
-
-    public static void updateContext(Context context) {
-        if (contextUpdated || (!CONTINUE) || (context == null)) return;
-        try {
-            TelephonyManager tManager = (TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE);
-            String uid = tManager.getDeviceId();
-            updateContext(uid);
-        } catch (Exception e) {
-        }
-    }
-
-    static {
-        String s = getSN();
-        CONTINUE = true;
-        updateContext(s);
-        contextUpdated = false;
-    }
 
     public static boolean isRTL() {
         Locale locale = Locale.getDefault();
@@ -189,21 +102,13 @@ public class FriBidi {
             logical_to_visual = new int[n];
             for (int i = 0; i < n; i++)
                 logical_to_visual[i] = i;
-        }
-        if (str != null && CONTINUE)
             analyze();
-        else if (str != null) {
-            int n = str.length();
-            char[] rep = new char[n];
-            for (int i = 0; i < n; i++)
-                rep[i] = ' ';
-            str = new String(rep);
         }
         before_reorder = str;
     }
     
     public void reorder(int offset, int length) {
-        if (str != null && CONTINUE) {
+        if (str != null) {
             int lastIndex = offset + length - 1;
             if ((lastIndex) > 0 && (lastIndex < before_reorder.length()) && (before_reorder.codePointAt(lastIndex) == 0x000A))
                 reorderLine(offset, length - 1);
@@ -212,7 +117,7 @@ public class FriBidi {
         }
     }
     public synchronized String reorderOnce() {
-        if ((str != null && CONTINUE) && !reordered) {
+        if (str != null && !reordered) {
             reorder(0, str.length());
             reordered = true;
         }

@@ -39,7 +39,6 @@ public class Jalali {
     public final static char DIGIT_DIFF = PERSIAN_ZERO - '0';
 
 	public static boolean isJalali(Context context) {
-        FriBidi.updateContext(context);
     	String type = null;
 	    if (context != null)
 		    type = Settings.System.getString(context.getContentResolver(),
